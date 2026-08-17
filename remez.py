@@ -65,7 +65,7 @@ def exchange(xn: list, x_new: float, e_max: float, errors: list):
 
 
 def remez(
-    f: callable, a: float, b: float, n: int, tol: float = 1e-4, max_iter: int = 50
+    f: callable, a: float, b: float, n: int, tol: float = 1e-4, max_iter: int = 100
 ):
     # Guess initial n+2 points equidistantly spaced in the interval [a, b]
     xn = np.linspace(a, b, n + 2)
@@ -87,25 +87,13 @@ def remez(
         x_max = x_samples[max_idx]
         e_max = e_samples[max_idx]
 
-        # Check for convergence
+        # Check for convergence - Trefethen paper
         C = abs(e_max) / abs(E)
         if C <= 1 + tol:
-            print(f"Converged after {i+1} iterations.")
             return P, e_max
 
-        # Update the points using the exchange algorithm
+        # Update the references points using single point exchange
         errors = f(xn) - P(xn)
         exchange(xn, x_max, e_max, errors)
 
-    print("Maximum iterations reached.")
     return P, e_max
-
-
-# Example from Trefethen paper
-def f(x):
-    return np.sin(3 * np.pi * x) * np.exp(x)
-
-
-P, e_max = remez(f, a=-1, b=1, n=3)
-
-print(f"Maximum error: {e_max:.6f}")
