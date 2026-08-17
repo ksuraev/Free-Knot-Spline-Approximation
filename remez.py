@@ -35,10 +35,10 @@ def calculate_polynomial(f: callable, xn: list, n: int):
     return P, E
 
 
-def exchange(xn: list, x_new: float, e_max: float, ex: list):
+def exchange(xn: list, x_new: float, e_max: float, errors: list):
     # If the new point is outside the leftmost point
     if x_new < xn[0]:
-        if np.sign(e_max) == np.sign(ex[0]):
+        if np.sign(e_max) == np.sign(errors[0]):
             xn[0] = x_new  # replace the leftmost point
         else:
             xn = np.insert(xn, 0, x_new)[
@@ -46,7 +46,7 @@ def exchange(xn: list, x_new: float, e_max: float, ex: list):
             ]  # add new point to the left and drop rightmost point
     # If the new point is outside the rightmost point
     elif x_new > xn[-1]:
-        if np.sign(e_max) == np.sign(ex[-1]):
+        if np.sign(e_max) == np.sign(errors[-1]):
             xn[-1] = x_new  # replace the rightmost point
         else:
             xn = np.append(
@@ -58,7 +58,7 @@ def exchange(xn: list, x_new: float, e_max: float, ex: list):
             if xn[i] < x_new < xn[i + 1]:
 
                 # Replace with the closest point with same sign
-                if np.sign(e_max) == np.sign(ex[i]):
+                if np.sign(e_max) == np.sign(errors[i]):
                     xn[i] = x_new
                 else:
                     xn[i + 1] = x_new
@@ -71,9 +71,7 @@ def remez(
     xn = np.linspace(a, b, n + 2)
 
     P = None
-
-    plt.ion()
-    fig = plt.figure(figsize=(10, 5))
+    e_max = None
 
     for i in range(max_iter):
         P, E = calculate_polynomial(f, xn, n)
@@ -82,44 +80,32 @@ def remez(
         x_samples = np.linspace(a, b, 10000)
         e_samples = f(x_samples) - P(x_samples)
 
-        # Find the absolute maximum error value
+        # Find the absolute maximum error value (deviation)
         abs_errors = np.abs(e_samples)
         max_idx = np.argmax(abs_errors)
 
         x_max = x_samples[max_idx]
         e_max = e_samples[max_idx]
 
-        plt.clf()
-
-        plt.plot(x_samples, f(x_samples), "k--", label="f")
-        plt.plot(x_samples, P(x_samples), "b-", label=f"P (Iter {i})")
-
-        # Highlight our current reference points
-        plt.scatter(xn, f(xn), color="red", zorder=5, label="Reference Points")
-
-        plt.title(f"Remez Iteration {i} | Max Error: {abs(e_max):.5f}")
-        plt.legend()
-        plt.pause(0.5)
-
         # Check for convergence
         C = abs(e_max) / abs(E)
-        if C < 1 + tol:
+        if C <= 1 + tol:
             print(f"Converged after {i+1} iterations.")
-            return P
+            return P, e_max
 
         # Update the points using the exchange algorithm
-        ex = f(xn) - P(xn)
-        exchange(xn, x_max, e_max, ex)
+        errors = f(xn) - P(xn)
+        exchange(xn, x_max, e_max, errors)
 
     print("Maximum iterations reached.")
-    return P
+    return P, e_max
 
 
+# Example from Trefethen paper
 def f(x):
     return np.sin(3 * np.pi * x) * np.exp(x)
 
 
-P = remez(f, a=-1, b=1, n=9)
+P, e_max = remez(f, a=-1, b=1, n=3)
 
-for i, coef in enumerate(P.coef):
-    print(f"c_{i}: {coef:.6f}")
+print(f"Maximum error: {e_max:.6f}")
