@@ -121,13 +121,9 @@ if __name__ == "__main__":
     degree = 1  # degree of polynomial to fit
 
     knots, d_min, d_max = run(False, a, b, k, degree)
-    print(
-        f"x_bar knots:       {knots}. Max and min deviations: {d_max:.8f}, {d_min:.8f}"
-    )
-    plot(knots, degree, a, b, "xbar_knots.png")
+    print(f"x_bar knots:       {knots}. Max and min d: {d_max:.8f}, {d_min:.8f}")
+    # plot(knots, degree, a, b, "xbar_knots.png")
 
     knots, d_min, d_max = run(True, a, b, k, degree)
-    print(
-        f"Last alt pt knots: {knots}. Max and min deviations: {d_max:.8f}, {d_min:.8f}"
-    )
-    plot(knots, degree, a, b, "last_alt_knots.png")
+    print(f"Last alt pt knots: {knots}. Max and min d: {d_max:.8f}, {d_min:.8f}")
+    # plot(knots, degree, a, b, "last_alt_knots.png")
