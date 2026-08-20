@@ -77,6 +77,7 @@ def step_one(knots, basis, m, n, f):
     solution = np.linalg.solve(A, b)
     a0 = solution[0]
     a = solution[1:-1].reshape(n, m)
+
     delta = solution[-1]
 
     def S(i, t):
@@ -86,16 +87,22 @@ def step_one(knots, basis, m, n, f):
     return S, delta
 
 
+def deviation(f, S, i, t):
+    """Compute the deviation between the function f and the spline S at point t."""
+    return f(t) - S(i, t)
+
+
 def find_max_deviation_in_interval(f, S, i, knots, tol=1e-6, n_samples=10000):
-    start, end = knots[i] + tol, knots[i + 1] - tol
+    start = knots[i] if i == 0 else knots[i] + tol
+    end = knots[i + 1] if i == n - 1 else knots[i + 1] - tol
     t_samples = np.linspace(start, end, n_samples)
-    d_samples = np.abs(np.array([f(t) - S(i, t) for t in t_samples]))
+    d_samples = np.abs(np.array([deviation(f, S, i, t) for t in t_samples]))
     max_index = np.argmax(d_samples)
     return t_samples[max_index], f(t_samples[max_index]) - S(i, t_samples[max_index])
 
 
 def find_max_deviation_overall(f, S, knots, n):
-    interval_index = None
+    interval = None
     t_star = None
     d_max = 0
 
@@ -104,65 +111,76 @@ def find_max_deviation_overall(f, S, knots, n):
         if abs(d) > abs(d_max):
             d_max = d
             t_star = t
-            interval_index = i
-    return interval_index, t_star, d_max
+            interval = i
+    return interval, t_star, d_max
 
 
-def exchange(interval_index, t_star, d_max, f, S, basis):
-    basis_points = basis[interval_index]
+def exchange(i, t_star, d_max, f, S, basis):
+    """Basis exchange rules
+
+    For an interval i, assume there is a point t*, that is not an internal knot, where the absolute deviation is higher than the absolute deviation at any of the basis points in that interval. Then, if there is a point t~ in the basis of that interval, nearest to t*, such that the deviation at t~ has the same sign as the deviation at t*, then t* has to replace t~ in the basis of that interval. Otherwise, no exchange is possible.
+    """
+    basis_points = basis[i]
     t_star_sign = np.sign(d_max)
 
-    deviation = lambda t: f(t) - S(interval_index, t)
+    # d = lambda t: f(t) - S(i, t)
 
+    # Get basis points to the left and right of t_star
     left = basis_points[basis_points < t_star]
     right = basis_points[basis_points > t_star]
     left_pt = left[-1] if len(left) else None
     right_pt = right[0] if len(right) else None
 
-    tilde_t_val = None
-    if left_pt is not None and np.sign(deviation(left_pt)) == t_star_sign:
-        tilde_t_val = left_pt
-    elif right_pt is not None and np.sign(deviation(right_pt)) == t_star_sign:
-        tilde_t_val = right_pt
-    if tilde_t_val is None:
+    tilde_t = None
+    if left_pt is not None and np.sign(deviation(f, S, i, left_pt)) == t_star_sign:
+        tilde_t = left_pt
+    elif right_pt is not None and np.sign(deviation(f, S, i, right_pt)) == t_star_sign:
+        tilde_t = right_pt
+    if tilde_t is None:
         return None
 
     # Replace tilde_t with t_star in basis points
     new_basis = [b.copy() for b in basis]
     new_interval_basis_pts = np.sort(
-        np.append(basis_points[~np.isclose(basis_points, tilde_t_val)], t_star)
+        np.append(basis_points[~np.isclose(basis_points, tilde_t)], t_star)
     )
-    new_basis[interval_index] = new_interval_basis_pts
+    new_basis[i] = new_interval_basis_pts
     return new_basis
 
 
-def all_max_deviations_in_interval(f, S, i, knots, tol=1e-6, n_samples=10000):
-    start, end = knots[i] + tol, knots[i + 1] - tol
+def all_max_deviations_in_interval(f, S, i, knots, tol=1e-4, n_samples=10000):
+    """Find all points of maximum deviation in a given interval [knots[i], knots[i+1]]"""
+
+    # Add a small tolerance to avoid sampling exactly at the knots for internal intervals
+    start = knots[i] if i == 0 else knots[i] + tol
+    end = knots[i + 1] if i == n - 1 else knots[i + 1] - tol
+
     t_samples = np.linspace(start, end, n_samples)
-    deviation = lambda t: f(t) - S(i, t)
-    deviations = np.array([deviation(x) for x in t_samples])
-    abs_deviations = np.abs(deviations)
+    # d = lambda t: f(t) - S(i, t)
+    d_samples = np.array([deviation(f, S, i, t) for t in t_samples])
+    abs_d_samples = np.abs(d_samples)
     index = [0]
     for j in range(1, len(t_samples) - 1):
         if (
-            abs_deviations[j] > abs_deviations[j - 1]
-            and abs_deviations[j] > abs_deviations[j + 1]
+            abs_d_samples[j] > abs_d_samples[j - 1]
+            and abs_d_samples[j] > abs_d_samples[j + 1]
         ):
             index.append(j)
     index.append(len(t_samples) - 1)
-    return [(t_samples[j], deviations[j]) for j in index]
+    return [(t_samples[j], d_samples[j]) for j in index]
 
 
 def find_alternance_points(f, S, knots, n):
+    """Find all alternance points (points where absolute deviation is maximal) in the spline approximation S of f over the intervals defined by knots."""
     all_points = []
     for i in range(n):
         interval_points = all_max_deviations_in_interval(f, S, i, knots)
         all_points.extend(interval_points)
 
     global_max = max(abs(d) for _, d in all_points)
-    filtered = np.array(
-        [(t, d) for t, d in all_points if np.isclose(abs(d), global_max)]
-    )
+    filtered = [
+        (t, d) for t, d in all_points if np.isclose(abs(d), global_max, rtol=1e-3)
+    ]
 
     # Handle duplicates
     unique = []
@@ -172,31 +190,35 @@ def find_alternance_points(f, S, knots, n):
 
     pts = np.array([t for t, _ in unique])
     signs = np.array([np.sign(d) for _, d in unique])
-    return pts, signs
+    return pts, signs, global_max
 
 
 # Necessary and suﬃcient optimality conditions for the spline S of degree m
-def check_exit_1(f, S, knots, basis, m, tol=1e-6):
-    pts, signs = find_alternance_points(f, S, knots, n)
+def check_exit_1(f, S, knots, n, m, tol=1e-4):
+    """Check the necessary and sufficient optimality conditions for the spline S of degree m (Theorem 1.10, Tarashnin, EXIT 1 in the algorithm)."""
+    pts, signs, global_max = find_alternance_points(f, S, knots, n)
     pts_and_signs = list(zip(pts, signs))
 
     def points_in_interval(i):
+        """Return all alternance points in the i-th interval (knots[i], knots[i+1])"""
         start, end = knots[i] + tol, knots[i + 1] - tol
         return [(t, s) for t, s in pts_and_signs if start <= t <= end]
 
     def points_alternate(pts_and_signs):
+        """Return True if the points alternate in sign, False otherwise."""
         signs = [s for _, s in pts_and_signs]
-        return len(signs) and all(
+        return len(signs) >= 2 and all(
             signs[i] != signs[i + 1] for i in range(len(signs) - 1)
         )
 
+    # Number of alternance points in each interval
     counts_per_interval = [len(points_in_interval(i)) for i in range(n)]
 
     # condition (i): in one subinterval, there is at least m+2 alternance points
     for i in range(n):
         pts_in_interval = points_in_interval(i)
         if len(pts_in_interval) >= m + 2 and points_alternate(pts_in_interval):
-            return True, pts, signs
+            return True, pts, signs, (i, i)
 
     for i in range(n):
         # Interval i fails (ii) point 1
@@ -215,12 +237,12 @@ def check_exit_1(f, S, knots, basis, m, tol=1e-6):
                 if knots[i] + tol <= t <= knots[j + 1] - tol
             ]
             # Passes condition (ii)
-            if len(combined_pts) >= (m * (j - i - 1) + 2) and points_alternate(
+            if len(combined_pts) >= (m * (j - i + 1) + 2) and points_alternate(
                 combined_pts
             ):
-                return True, pts, signs
+                return True, pts, signs, (i, j)
 
-    return False, pts, signs
+    return False, pts, signs, None
 
 
 def plot(f, S, knots, basis, a, b, n, m, k, plot_name):
@@ -249,7 +271,7 @@ def plot(f, S, knots, basis, a, b, n, m, k, plot_name):
     ax.set_title(f"Degree-{m} approximation with {k} fixed knots")
     ax.legend(loc="best")
     fig.tight_layout()
-    fig.savefig("plot2.png")
+    fig.savefig(plot_name)
     plt.show()
 
 
@@ -269,13 +291,12 @@ if __name__ == "__main__":
     # Choose initial basis
     basis = step_zero(knots, m, n)
 
+    # Construct polynomial spline S
     S, delta = step_one(knots, basis, m, n, f)
-    optimal, pts, signs = check_exit_1(f, S, knots, n, m)
+    optimal, pts, signs, _ = check_exit_1(f, S, knots, n, m)
     print(
-        f"Iteration 0: |delta|={abs(delta):.5f}  alternance_count={len(pts)}  optimal={optimal}"
+        f"Iteration 0: |delta|={abs(delta):.5f}  basis points: {np.round(np.concatenate(basis), 6)}"
     )
-
-    plot(f, S, knots, basis, a, b, n, m, k, "nadia_plot_zero.png")
 
     max_iterations = 100
 
@@ -284,18 +305,23 @@ if __name__ == "__main__":
         new_basis = exchange(interval_index, t_star, max_dev, f, S, basis)
 
         if new_basis is None:
+            print(f"Basis points: {np.round(np.concatenate(basis), 6)}")
             print(f"EXIT 2 (no valid exchange) at iteration {iteration}")
             break
 
         basis = new_basis
         S, delta = step_one(knots, basis, m, n, f)
-        optimal, pts, signs = check_exit_1(f, S, knots, n, m)
+        optimal, pts, signs, chain = check_exit_1(f, S, knots, n, m)
 
         if optimal:
+
             print(
                 f"EXIT 1 (spline is optimal) at iteration {iteration} with delta {abs(delta):.5f}"
             )
+            i, j = chain
+            print(f"minimal chain: interval(s) {i}-{j}  (length {j-i+1})")
+            print(f"basis points:      {np.round(np.concatenate(basis), 6)}")
             print(f"alternance points: {np.round(pts, 6)}")
             break
 
-    plot(f, S, knots, basis, a, b, n, m, k, "nadia_plot_final.png")
+    # plot(f, S, knots, basis, a, b, n, m, k, "nadia_plot_final.png")
