@@ -93,6 +93,7 @@ def deviation(f, S, i, t):
 
 
 def find_max_deviation_in_interval(f, S, i, knots, tol=1e-6, n_samples=10000):
+    """Find the point of maximum deviation in the interval [knots[i], knots[i+1]]"""
     start = knots[i] if i == 0 else knots[i] + tol
     end = knots[i + 1] if i == n - 1 else knots[i + 1] - tol
     t_samples = np.linspace(start, end, n_samples)
@@ -102,6 +103,7 @@ def find_max_deviation_in_interval(f, S, i, knots, tol=1e-6, n_samples=10000):
 
 
 def find_max_deviation_overall(f, S, knots, n):
+    """Find the interval and point of maximum deviation across all intervals."""
     interval = None
     t_star = None
     d_max = 0
@@ -123,14 +125,13 @@ def exchange(i, t_star, d_max, f, S, basis):
     basis_points = basis[i]
     t_star_sign = np.sign(d_max)
 
-    # d = lambda t: f(t) - S(i, t)
-
     # Get basis points to the left and right of t_star
     left = basis_points[basis_points < t_star]
     right = basis_points[basis_points > t_star]
     left_pt = left[-1] if len(left) else None
     right_pt = right[0] if len(right) else None
 
+    # Check if the deviation at the left or right basis point has the same sign as the deviation at t_star
     tilde_t = None
     if left_pt is not None and np.sign(deviation(f, S, i, left_pt)) == t_star_sign:
         tilde_t = left_pt
@@ -155,10 +156,12 @@ def all_max_deviations_in_interval(f, S, i, knots, tol=1e-4, n_samples=10000):
     start = knots[i] if i == 0 else knots[i] + tol
     end = knots[i + 1] if i == n - 1 else knots[i + 1] - tol
 
+    # Take n_samples evenly spaced points in the interval
     t_samples = np.linspace(start, end, n_samples)
-    # d = lambda t: f(t) - S(i, t)
     d_samples = np.array([deviation(f, S, i, t) for t in t_samples])
     abs_d_samples = np.abs(d_samples)
+
+    # Find local maxima in the absolute deviation samples
     index = [0]
     for j in range(1, len(t_samples) - 1):
         if (
