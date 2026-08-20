@@ -5,18 +5,17 @@ import remez
 
 
 def d(a, b):
-    _, e_max = remez.remez(f, a, b, degree)
-    return abs(e_max)
+    _, e_max, ref_points = remez.remez(f, a, b, degree)
+    return abs(e_max), ref_points
 
 
-# Same as example 4 from Meinardus paper
 def f(x):
-    return x ** (1 / 2)
+    return np.sin(x)
 
 
-a, b = 0, 1
-k = 5  # number of free knots (not including a and b)
-degree = 5  # degree of polynomial to fit
+a, b = 0, 6
+k = 3  # number of free knots (not including a and b)
+degree = 3  # degree of polynomial to fit
 tolerance = 1e-6
 max_iter = 100
 
@@ -24,7 +23,7 @@ max_iter = 100
 knots = np.linspace(a, b, k + 2)
 deviations = []
 for i in range(len(knots) - 1):
-    e_max = d(knots[i], knots[i + 1])
+    e_max, _ = d(knots[i], knots[i + 1])
     deviations.append(e_max)
 
 d_min = min(deviations)
@@ -46,16 +45,16 @@ for iteration in range(max_iter):
 
     # Subroutine: solve d(x_i, x_bar) = d_n while knots can be placed
     for _ in range(k):
-        if d(x_i, b) <= d_n:
+        d_i, _ = d(x_i, b)
+        if d_i <= d_n:
             break
 
         x_l = x_i
         x_u = b
-        x_bar = None
 
         for _ in range(max_iter):
             x_bar = (x_l + x_u) / 2
-            e = d(x_i, x_bar)
+            e, ref_points = d(x_i, x_bar)
 
             if abs(e - d_n) < tolerance * d_n:
                 break
@@ -64,8 +63,15 @@ for iteration in range(max_iter):
             else:
                 x_u = x_bar
 
-        new_knots.append(x_bar)
-        x_i = x_bar
+        # Previous - setting knot to x_bar
+        # new_knots.append(x_bar)
+        # x_i = x_bar
+
+        # New - setting knot to last reference point instead of x_bar
+        new_knot = ref_points[-1]
+        new_knots.append(new_knot)
+        x_i = new_knot
+
         j += 1
 
     # Collapse any unplaced knots to the right endpoint b
@@ -75,17 +81,19 @@ for iteration in range(max_iter):
     knots = np.array(new_knots)
 
     # c_n = deviation of the last real interval
-    c_n = d(knots[j], knots[j + 1])
+    c_n, _ = d(knots[j], knots[j + 1])
 
     d_min = max(d_min, min(c_n, d_n))
     d_max = min(d_max, max(c_n, d_n))
 
+# Print knots
+print("final knots:", knots)
 print(f"final knots max and min deviations: {d_max:.8f}, {d_min:.8f}")
 
 # Plot original function, polynomial approximation and final knots
 piecewise_polynomial = []
 for i in range(len(knots) - 1):
-    P, _ = remez.remez(f, knots[i], knots[i + 1], degree)
+    P, _, _ = remez.remez(f, knots[i], knots[i + 1], degree)
     piecewise_polynomial.append((knots[i], knots[i + 1], P))
 
 fig, ax = plt.subplots(figsize=(10, 6))

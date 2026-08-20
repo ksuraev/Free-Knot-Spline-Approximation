@@ -39,21 +39,23 @@ def exchange(xn: list, x_new: float, e_max: float, errors: list):
     # If the new point is outside the leftmost point
     if x_new < xn[0]:
         if np.sign(e_max) == np.sign(errors[0]):
-            xn[0] = x_new  # replace the leftmost point
+            # replace the leftmost point
+            xn[0] = x_new
         else:
-            xn = np.insert(xn, 0, x_new)[
-                :-1
-            ]  # add new point to the left and drop rightmost point
+            # add x_new to the left and drop rightmost point
+            xn = np.insert(xn, 0, x_new)[:-1]
+
     # If the new point is outside the rightmost point
     elif x_new > xn[-1]:
         if np.sign(e_max) == np.sign(errors[-1]):
-            xn[-1] = x_new  # replace the rightmost point
+            # replace the rightmost point
+            xn[-1] = x_new
         else:
-            xn = np.append(
-                xn[1:], x_new
-            )  # add new point to the right and drop leftmost point
+            # add x_new to the right and drop leftmost point
+            xn = np.append(xn[1:], x_new)
+
+    # If the new point is between two existing points
     else:
-        # If the new point is between two existing points
         for i in range(len(xn) - 1):
             if xn[i] < x_new < xn[i + 1]:
 
@@ -62,10 +64,11 @@ def exchange(xn: list, x_new: float, e_max: float, errors: list):
                     xn[i] = x_new
                 else:
                     xn[i + 1] = x_new
+    return xn
 
 
 def remez(
-    f: callable, a: float, b: float, n: int, tol: float = 1e-4, max_iter: int = 100
+    f: callable, a: float, b: float, n: int, tol: float = 1e-6, max_iter: int = 100
 ):
     # Guess initial n+2 points equidistantly spaced in the interval [a, b]
     xn = np.linspace(a, b, n + 2)
@@ -90,10 +93,10 @@ def remez(
         # Check for convergence - Trefethen paper
         C = abs(e_max) / abs(E)
         if C <= 1 + tol:
-            return P, e_max
+            return P, e_max, xn
 
         # Update the references points using single point exchange
         errors = f(xn) - P(xn)
-        exchange(xn, x_max, e_max, errors)
+        xn = exchange(xn, x_max, e_max, errors)
 
-    return P, e_max
+    return P, e_max, xn
