@@ -14,8 +14,8 @@ def f(x):
 
 
 a, b = 0, 6
-k = 3  # number of free knots (not including a and b)
-degree = 3  # degree of polynomial to fit
+k = 2  # number of free knots (not including a and b)
+degree = 2  # degree of polynomial to fit
 tolerance = 1e-6
 max_iter = 100
 
@@ -111,8 +111,6 @@ for start, end, P in piecewise_polynomial:
 for x in knots:
     ax.axvline(x, color="red", ls=":", label="knots" if x == knots[0] else None)
 
-ax.set_xlabel("x")
-ax.set_ylabel("y")
 ax.set_title(f"Degree-{degree} approximation with {k} free knots")
 ax.legend(loc="best")
 fig.tight_layout()
