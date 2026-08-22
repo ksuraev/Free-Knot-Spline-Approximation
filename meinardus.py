@@ -5,8 +5,8 @@ import remez
 
 
 def d(a, b, degree):
-    _, e_max, alt_pts = remez.remez(f, a, b, degree)
-    return abs(e_max), alt_pts
+    _, d_max, alt_pts = remez.remez(f, a, b, degree)
+    return abs(d_max), alt_pts
 
 
 def f(x):
@@ -18,8 +18,8 @@ def step_zero(a, b, k, degree):
     deviations = []
 
     for i in range(len(knots) - 1):
-        e_max, _ = d(knots[i], knots[i + 1], degree)
-        deviations.append(e_max)
+        d_i_max, _ = d(knots[i], knots[i + 1], degree)
+        deviations.append(d_i_max)
 
     d_min = min(deviations)
     d_max = max(deviations)
@@ -34,7 +34,7 @@ def run(use_last_alt_pt, a, b, k, degree, tolerance=1e-6, max_iter=100):
         if d_max - d_min <= tolerance:
             break
 
-        # target deviation for this iteration
+        # target deviation for this iteration computed as geometric mean
         d_n = (d_min * d_max) ** 0.5
 
         new_knots = [a]
@@ -47,16 +47,17 @@ def run(use_last_alt_pt, a, b, k, degree, tolerance=1e-6, max_iter=100):
             if d_i <= d_n:
                 break
 
+            # Set lower and upper bounds for x_bar
             x_l = x_i
             x_u = b
 
             for _ in range(max_iter):
                 x_bar = (x_l + x_u) / 2
-                e, alt_pts = d(x_i, x_bar, degree)
+                d_i_max, alt_pts = d(x_i, x_bar, degree)
 
-                if abs(e - d_n) < tolerance * d_n:
+                if abs(d_i_max - d_n) < tolerance * d_n:
                     break
-                elif e < d_n:
+                elif d_i_max < d_n:
                     x_l = x_bar
                 else:
                     x_u = x_bar
@@ -80,6 +81,7 @@ def run(use_last_alt_pt, a, b, k, degree, tolerance=1e-6, max_iter=100):
         # c_n = deviation of the last real interval
         c_n, _ = d(knots[j], knots[j + 1], degree)
 
+        # Update d_min and d_max for the next iteration
         d_min = max(d_min, min(c_n, d_n))
         d_max = min(d_max, max(c_n, d_n))
 
@@ -116,8 +118,9 @@ def plot(knots, degree, a, b, plot_name):
 
 
 if __name__ == "__main__":
+    f = lambda x: np.sin(x)
     a, b = 0, 6
-    k = 5  # number of free knots (not including a and b)
+    k = 2  # number of free knots (not including a and b)
     degree = 1  # degree of polynomial to fit
 
     knots, d_min, d_max = run(False, a, b, k, degree)

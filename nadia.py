@@ -257,19 +257,20 @@ def plot(f, S, knots, basis, a, b, n, m, k, plot_name):
     for i in range(n):
         t = np.arange(knots[i], knots[i + 1], 0.01)
         ax.plot(t, S(i, t), color="dodgerblue", label="S(A,t)" if i == 0 else None)
+
+    # basis points as vertical dashed lines
+    for i in range(n):
+        for j in basis[i]:
+            ax.axvline(
+                j,
+                color="grey",
+                ls="--",
+                lw=1,
+                label="basis points" if i == 0 and j == basis[0][0] else None,
+            )
     # knots as vertical lines
     for i in knots:
         ax.axvline(i, color="red", ls=":", label="knots" if i == knots[0] else None)
-
-    # basis points as dots
-    for i in range(n):
-        ax.plot(
-            basis[i],
-            f(basis[i]),
-            "o",
-            color="orange",
-            label="basis points" if i == 0 else None,
-        )
 
     ax.set_title(f"Degree-{m} approximation with {k} fixed knots")
     ax.legend(loc="best")
@@ -327,4 +328,4 @@ if __name__ == "__main__":
             print(f"alternance points: {np.round(pts, 6)}")
             break
 
-    # plot(f, S, knots, basis, a, b, n, m, k, "nadia_plot_final.png")
+    plot(f, S, knots, basis, a, b, n, m, k, "nadia_plot.png")

@@ -73,9 +73,6 @@ def remez(
     # Guess initial n+2 points equidistantly spaced in the interval [a, b]
     xn = np.linspace(a, b, n + 2)
 
-    P = None
-    e_max = None
-
     for i in range(max_iter):
         P, E = calculate_polynomial(f, xn, n)
 
@@ -91,8 +88,12 @@ def remez(
         e_max = e_samples[max_idx]
 
         # Check for convergence - Trefethen paper
-        C = abs(e_max) / abs(E)
-        if C <= 1 + tol:
+        if abs(E) < 1e-14:
+            converged = abs(e_max) < 1e-14
+        else:
+            C = abs(e_max) / abs(E)
+            converged = C <= 1 + tol
+        if converged:
             return P, e_max, xn
 
         # Update the references points using single point exchange
@@ -100,3 +101,42 @@ def remez(
         xn = exchange(xn, x_max, e_max, errors)
 
     return P, e_max, xn
+
+
+def plot(
+    f: callable,
+    P: np.polynomial.Polynomial,
+    xn: list,
+    a: float,
+    b: float,
+    n: int,
+    plot_name: str,
+):
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    # original function f(x)
+    x = np.arange(a, b, 0.01)
+    ax.plot(x, f(x), color="slategray", label="f(x)")
+
+    # approximation polynomial P(x)
+    ax.plot(x, P(x), color="dodgerblue", label="P(x)")
+
+    # alternance points
+    for x in xn:
+        ax.axvline(x=x, color="lightgray", linestyle="--", alpha=0.5)
+
+    ax.set_title(f"Remez approximation of degree {n}")
+    ax.legend(loc="best")
+    fig.tight_layout()
+    fig.savefig(plot_name)
+    plt.show()
+
+
+if __name__ == "__main__":
+    f = lambda x: np.sin(x)
+    a, b = 0, 1.65072727
+    n = 2
+    P, e_max, xn = remez(f, a, b, n)
+    print(f"Max error: {e_max}")
+    print(f"Alternance points: {xn}")
+    plot(f, P, xn, a, b, n, "remez.png")
