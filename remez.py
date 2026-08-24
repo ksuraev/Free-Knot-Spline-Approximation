@@ -133,7 +133,10 @@ def plot(
 
 
 if __name__ == "__main__":
-    f = lambda x: np.sin(x)
+
+    def f(x):
+        return np.sin(x)
+
     a, b = 0, 1.65072727
     n = 2
     P, e_max, xn = remez(f, a, b, n)
