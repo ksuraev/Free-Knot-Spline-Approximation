@@ -3,7 +3,7 @@ import numpy as np
 
 TOL = 1e-5
 
-# Note: seems like setting ALTERNANCE_TOL <= INITIAL_KNOT_OFFSET is the only thing that works sin(t) on [2,6] with k=1, m=2 (Nadia's 2nd experiment)
+# Note: seems like setting ALTERNANCE_TOL <= INITIAL_KNOT_OFFSET is the only thing that works sin(t) on [2,6] with k=1, m=2 (Nadia's 2nd experiment that finds optimal spline)
 # I cannot explain why though
 INITIAL_KNOT_OFFSET = 1e-5
 ALTERNANCE_TOL = 1e-5
