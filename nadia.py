@@ -5,7 +5,7 @@ TOL = 1e-5
 
 # Note: seems like setting ALTERNANCE_TOL <= INITIAL_KNOT_OFFSET is the only thing that works sin(t) on [2,6] with k=1, m=2 (Nadia's 2nd experiment that finds optimal spline)
 # I cannot explain why though
-INITIAL_KNOT_OFFSET = 1e-5
+INITIAL_KNOT_OFFSET = 0 #1e-5
 ALTERNANCE_TOL = 1e-5
 
 
@@ -20,8 +20,13 @@ def step_zero(knots, m, n):
 
         count = m + 1 if i == 0 or i == n - 1 else m
 
-        basis.append(np.linspace(start, end, count))
+        s = 0 if i == 0 else 1
+        e = -1 if i == n-1 else -2
+        local_basis = np.linspace(start, end, m+3)[s:e]
+        basis.append(local_basis)
 
+    print([len(x) for x in basis])
+    print(basis)
     return basis
 
 
@@ -444,7 +449,8 @@ if __name__ == "__main__":
     n = k + 1  # number of subintervals
 
     # Choose intial knots as equidistant points
-    knots = np.linspace(a, b, k + 2)
+    #knots = np.linspace(a, b, k + 2)
+    knots = [2,3.5,6]
 
     # Choose initial basis
     basis = step_zero(knots, m, n)
