@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def calculate_polynomial(f: callable, xn: list, n: int):
+def calculate_polynomial(f, xnt, n):
 
     # Initialise matrix A and vector b
     A = np.zeros((n + 2, n + 2))
@@ -35,7 +35,7 @@ def calculate_polynomial(f: callable, xn: list, n: int):
     return P, E
 
 
-def exchange(xn: list, x_new: float, e_max: float, errors: list):
+def exchange(xn, x_new, e_max, errors):
     # If the new point is outside the leftmost point
     if x_new < xn[0]:
         if np.sign(e_max) == np.sign(errors[0]):
@@ -67,9 +67,7 @@ def exchange(xn: list, x_new: float, e_max: float, errors: list):
     return xn
 
 
-def remez(
-    f: callable, a: float, b: float, n: int, tol: float = 1e-6, max_iter: int = 100
-):
+def remez(f, a, b, n, tol=1e-6, max_iter=100):
     # Guess initial n+2 points equidistantly spaced in the interval [a, b]
     xn = np.linspace(a, b, n + 2)
 
@@ -103,15 +101,7 @@ def remez(
     return P, e_max, xn
 
 
-def plot(
-    f: callable,
-    P: np.polynomial.Polynomial,
-    xn: list,
-    a: float,
-    b: float,
-    n: int,
-    plot_name: str,
-):
+def plot(f, P, xnt, a, b, n, plot_name):
     fig, ax = plt.subplots(figsize=(10, 6))
 
     # original function f(x)
@@ -142,4 +132,4 @@ if __name__ == "__main__":
     P, e_max, xn = remez(f, a, b, n)
     print(f"Max error: {e_max}")
     print(f"Alternance points: {xn}")
-    plot(f, P, xn, a, b, n, "remez.png")
+    # plot(f, P, xn, a, b, n, "remez.png")
