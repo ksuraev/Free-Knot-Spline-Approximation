@@ -152,7 +152,7 @@ def find_extrema_overall(f, S, knots, n, n_samples=10000):
     i_min = None
 
     for i in range(n):
-        # [] for the first interval, then (]
+        # first interval is closed then (]
         if i == 0:
             t_samples = np.linspace(knots[i], knots[i + 1], n_samples)
         else:
@@ -163,11 +163,11 @@ def find_extrema_overall(f, S, knots, n, n_samples=10000):
         idx_max = np.argmax(d_samples)
         idx_min = np.argmin(d_samples)
 
-        # max (+) deviation
+        # max signed deviation
         if d_samples[idx_max] > d_max:
             i_max, t_max, d_max = i, t_samples[idx_max], d_samples[idx_max]
 
-        # max (-) deviation
+        # min signed deviation
         if d_samples[idx_min] < d_min:
             i_min, t_min, d_min = i, t_samples[idx_min], d_samples[idx_min]
 
@@ -459,11 +459,11 @@ TEST_FUNCTIONS = {
 
 
 if __name__ == "__main__":
-    function_name = "log"
+    function_name = "sin"
     f, f_label = TEST_FUNCTIONS[function_name]
 
     a, b = 0, 6
-    k = 1  # number of fixed knots (not including a and b)
+    k = 2  # number of fixed knots (not including a and b)
     m = 2  # degree of polynomial to fit in each subinterval
     n = k + 1  # number of subintervals
 
@@ -489,7 +489,7 @@ if __name__ == "__main__":
 
         if optimal:
             print("EXIT 1 (spline is optimal).")
-            print("basis:", np.round(np.concatenate(basis), 6))
+            print("basis:            ", np.round(np.concatenate(basis), 6))
             print("alternance points:", np.round(pts, 6))
             break
 
@@ -497,7 +497,8 @@ if __name__ == "__main__":
 
         if new_basis is None:
             print("EXIT 2 (no valid exchange).")
-            print("current basis:", np.round(np.concatenate(basis), 6))
+            print("current basis:    ", np.round(np.concatenate(basis), 6))
+            print("alternance points:", np.round(pts, 6))
             break
 
         # Construct new spline
