@@ -351,43 +351,118 @@ def check_exit_1(f, S, knots, n, m, global_max):
     return False, pts, signs, None
 
 
-def plot(f, S, knots, basis, a, b, n, m, k, plot_name):
+def plot_approximation(f, f_label, a, b, n, S, knots, basis, m, status):
     fig, ax = plt.subplots(figsize=(10, 6))
-    t = np.arange(a, b, 0.01)
-    ax.plot(t, f(t), color="slategray", label="f(t)")
 
-    # approximation polynomial S(A,t) over each interval
-    for i in range(n):
-        t = np.arange(knots[i], knots[i + 1], 0.01)
-        ax.plot(t, S(i, t), color="dodgerblue", label="S(A,t)" if i == 0 else None)
+    t = np.linspace(a, b, 1000)
+    ax.plot(t, f(t), color="slategrey", label=f_label)
 
-    # basis points as vertical dashed lines
     for i in range(n):
-        for j in basis[i]:
+        t_interval = np.linspace(knots[i], knots[i + 1])
+        ax.plot(
+            t_interval,
+            S(i, t_interval),
+            color="dodgerblue",
+            label="Spline approximation" if i == 0 else None,
+        )
+
+    for i, interval_basis in enumerate(basis):
+        for j, point in enumerate(interval_basis):
             ax.axvline(
-                j,
-                color="grey",
-                ls="--",
-                lw=1,
-                label="basis points" if i == 0 and j == basis[0][0] else None,
+                point,
+                linestyle=":",
+                color="black",
+                label="Basis points" if i == 0 and j == 0 else None,
             )
-    # knots as vertical lines
-    for i in knots:
-        ax.axvline(i, color="red", ls=":", label="knots" if i == knots[0] else None)
 
-    ax.set_title(f"Degree-{m} approximation with {k+2} fixed knots")
+    for j, knot in enumerate(knots):
+        ax.axvline(
+            knot,
+            color="red",
+            lw=0.5,
+            linestyle="-",
+            label="Knots" if j == 0 else None,
+        )
+
+    ax.set_xlabel("t")
+    ax.set_title(
+        f"Degree-{m} spline approximation of {f_label} with {k} internal knots ({status})"
+    )
     ax.legend(loc="best")
+
     fig.tight_layout()
-    fig.savefig(plot_name)
-    plt.show()
+    fig.savefig(f"{function_name}_k{k}_m{m}_approximation.png")
+    # plt.show()
 
 
-def f(t):
+def plot_deviation(f, f_label, n, S, knots, basis, status):
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    for i in range(n):
+        t_interval = np.linspace(knots[i], knots[i + 1], 1000)
+
+        d = np.array([deviation(f, S, i, t) for t in t_interval])
+
+        ax.plot(
+            t_interval, d, color="slategray", label=r"$f(t)-S(t)$" if i == 0 else None
+        )
+
+    ax.axhline(0)
+
+    for i, interval_basis in enumerate(basis):
+        for j, point in enumerate(interval_basis):
+            ax.axvline(
+                point,
+                linestyle=":",
+                color="black",
+                label="Basis points" if i == 0 and j == 0 else None,
+            )
+
+    for j, knot in enumerate(knots):
+        ax.axvline(
+            knot,
+            color="red",
+            lw=0.5,
+            linestyle="-",
+            label="Knots" if j == 0 else None,
+        )
+
+    ax.set_xlabel("t")
+    ax.set_ylabel(r"$f(t)-S(t)$")
+    ax.set_title(
+        f"Deviation for degree-{m} spline approximation of {f_label} with {k} internal knots ({status})"
+    )
+    ax.legend(loc="best")
+
+    fig.tight_layout()
+    fig.savefig(f"{function_name}_k{k}_m{m}_deviation.png")
+    # plt.show()
+
+
+def f_sin(t):
     return np.sin(t)
 
 
+def f_log(t):
+    return np.log(t + 1)
+
+
+def f_log_sin(t):
+    return np.log(np.sin(t) + 3)
+
+
+TEST_FUNCTIONS = {
+    "sin": (f_sin, r"$\sin(t)$"),
+    "log": (f_log, r"$\log(t+1)$"),
+    "log_sin": (f_log_sin, r"$\log(\sin(t)+3)$"),
+}
+
+
 if __name__ == "__main__":
-    a, b = 2, 6
+    function_name = "log"
+    f, f_label = TEST_FUNCTIONS[function_name]
+
+    a, b = 0, 6
     k = 1  # number of fixed knots (not including a and b)
     m = 2  # degree of polynomial to fit in each subinterval
     n = k + 1  # number of subintervals
@@ -415,6 +490,7 @@ if __name__ == "__main__":
         if optimal:
             print("EXIT 1 (spline is optimal).")
             print("basis:", np.round(np.concatenate(basis), 6))
+            print("alternance points:", np.round(pts, 6))
             break
 
         new_basis = exchange(i_star, t_star, d_star, f, S, basis, knots, n)
@@ -440,4 +516,6 @@ if __name__ == "__main__":
     print(f"Minimum deviation: {d_min:.5f} at t = {t_min:.5f}")
     print(f"Maximum absolute deviation: " f"{d_star:.5f} at t = {t_star:.5f}")
 
-    plot(f, S, knots, basis, a, b, n, m, k, "nadia_plot.png")
+    status = "Optimal" if optimal else "Not optimal"
+    plot_approximation(f, f_label, a, b, n, S, knots, basis, m, status)
+    plot_deviation(f, f_label, n, S, knots, basis, status)
