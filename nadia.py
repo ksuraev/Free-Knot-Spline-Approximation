@@ -1,13 +1,16 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-TOL = 1e-8
-INITIAL_KNOT_OFFSET = 1e-3
-ALTERNANCE_RTOL = 5e-3
+TOL = 1e-5
+
+# Note: seems like setting ALTERNANCE_TOL <= INITIAL_KNOT_OFFSET is the only thing that works sin(t) on [2,6] with k=1, m=2 (Nadia's 2nd experiment)
+# I cannot explain why though
+INITIAL_KNOT_OFFSET = 1e-5
+ALTERNANCE_TOL = 1e-5
 
 
-# Form intial basis - m per internal subinterval, m+1 per endpoint subinterval
-# Internal spline knots are excluded from the basis
+# Form intial basis - m per internal subinterval, m+1 per endpoint subinterval. Internal spline knots are excluded from the basis
+# Note: equidistant points in each subinterval fails straight away with exit 2 (t* is internal knot)
 def step_zero(knots, m, n):
     basis = []
 
@@ -20,23 +23,6 @@ def step_zero(knots, m, n):
         basis.append(np.linspace(start, end, count))
 
     return basis
-
-
-# evenly spaced basis points in each subinterval fails straightaway with exit 2
-# def step_zero(knots, m, n):
-#     basis = []
-
-#     for i in range(n):
-#         if i == 0:
-#             # Leftmost subinterva first point can be at a
-#             basis.append(np.linspace(knots[i], knots[i + 1], m + 2)[:-1])
-#         elif i == n - 1:
-#             # Rightmost subinterval, last point can be at b
-#             basis.append(np.linspace(knots[i], knots[i + 1], m + 2)[1:])
-#         else:
-#             # Internal subintervals, cannot include the knots
-#             basis.append(np.linspace(knots[i], knots[i + 1], m + 2)[1:-1])
-#     return basis
 
 
 # Construct P_i matrix for given subinterval i
@@ -152,7 +138,6 @@ def find_extrema_overall(f, S, knots, n, n_samples=10000):
     i_min = None
 
     for i in range(n):
-        # first interval is closed then (]
         if i == 0:
             t_samples = np.linspace(knots[i], knots[i + 1], n_samples)
         else:
@@ -212,7 +197,7 @@ def exchange(i, t_star, d_star, f, S, basis, knots, n):
     # absolute deviation at t* must be greater than the absolute deviation at any of the basis points in that interval
     if abs(d_star) <= np.max(np.abs(basis_deviations)) + TOL:
         print(
-            f"Absolute deviation at t*, {d_star} is <= max absolute deviation at basis points in interval {i}, |d|={np.max(np.abs(basis_deviations))}"
+            f"Absolute deviation at t*, {d_star} is <= max absolute deviation at basis points in interval {i}, {np.max(np.abs(basis_deviations))}"
         )
         return None
 
@@ -246,18 +231,17 @@ def exchange(i, t_star, d_star, f, S, basis, knots, n):
 
 # find sampled alternance points across all intervals, filtered by global maximum deviation
 def find_alternance_points(f, S, knots, n, global_max):
-    all_points = []
+    all_alt_points = []
 
     for i in range(n):
-        all_points.extend(find_local_abs_deviation_maxima(f, S, i, knots))
+        all_alt_points.extend(find_local_abs_deviation_maxima(f, S, i, knots))
 
-    if not all_points:
+    if not all_alt_points:
         return np.array([]), np.array([]), 0.0
 
+    # Filter points that are within ALTERNANCE_TOL of the global maximum deviation
     filtered = [
-        (t, d)
-        for t, d in all_points
-        if np.isclose(abs(d), global_max, rtol=ALTERNANCE_RTOL)
+        (t, d) for t, d in all_alt_points if abs(abs(d) - global_max) <= ALTERNANCE_TOL
     ]
 
     # Handle duplicates
@@ -297,7 +281,7 @@ def check_exit_1(f, S, knots, n, m, global_max):
             )
             return True, pts, signs, (i, i)
 
-    # Condition (ii):
+    # Condition (ii)
     for i in range(n):
 
         for j in range(i + 1, n):
@@ -377,11 +361,7 @@ def plot_approximation(f, f_label, a, b, n, S, knots, basis, m, status):
 
     for j, knot in enumerate(knots):
         ax.axvline(
-            knot,
-            color="red",
-            lw=0.5,
-            linestyle="-",
-            label="Knots" if j == 0 else None,
+            knot, color="red", lw=0.5, linestyle="-", label="Knots" if j == 0 else None
         )
 
     ax.set_xlabel("t")
@@ -392,7 +372,7 @@ def plot_approximation(f, f_label, a, b, n, S, knots, basis, m, status):
 
     fig.tight_layout()
     fig.savefig(f"{function_name}_k{k}_m{m}_approximation.png")
-    # plt.show()
+    plt.show()
 
 
 def plot_deviation(f, f_label, n, S, knots, basis, status):
@@ -420,11 +400,7 @@ def plot_deviation(f, f_label, n, S, knots, basis, status):
 
     for j, knot in enumerate(knots):
         ax.axvline(
-            knot,
-            color="red",
-            lw=0.5,
-            linestyle="-",
-            label="Knots" if j == 0 else None,
+            knot, color="red", lw=0.5, linestyle="-", label="Knots" if j == 0 else None
         )
 
     ax.set_xlabel("t")
@@ -436,7 +412,7 @@ def plot_deviation(f, f_label, n, S, knots, basis, status):
 
     fig.tight_layout()
     fig.savefig(f"{function_name}_k{k}_m{m}_deviation.png")
-    # plt.show()
+    plt.show()
 
 
 def f_sin(t):
@@ -462,8 +438,8 @@ if __name__ == "__main__":
     function_name = "sin"
     f, f_label = TEST_FUNCTIONS[function_name]
 
-    a, b = 0, 6
-    k = 2  # number of fixed knots (not including a and b)
+    a, b = 2, 6
+    k = 1  # number of internal fixed knots
     m = 2  # degree of polynomial to fit in each subinterval
     n = k + 1  # number of subintervals
 
