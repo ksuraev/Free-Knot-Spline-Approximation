@@ -1,11 +1,15 @@
+# test candidate internal knots
+# bisect the interval of internal knots where the derivative difference changes sign
+import csv
+
 import matplotlib.pyplot as plt
 import numpy as np
 
 TOL = 1e-5
-ALTERNANCE_TOL = 1e-5
 
 
 # Form intial basis - m per internal subinterval, m+1 per endpoint subinterval. Internal spline knots are excluded from the basis
+# Note: equidistant points in each subinterval fails straight away with exit 2 (t* is internal knot)
 def step_zero(knots, m, n):
     basis = []
 
@@ -21,8 +25,8 @@ def step_zero(knots, m, n):
         local_basis = np.linspace(start, end, m + 3)[s:e]
         basis.append(local_basis)
 
-    print([len(x) for x in basis])
-    print(basis)
+    # print([len(x) for x in basis])
+    # print(basis)
     return basis
 
 
@@ -81,7 +85,6 @@ def step_one(knots, basis, m, n, f):
     solution = np.linalg.solve(A, b)
     a0 = solution[0]
     a = solution[1:-1].reshape(n, m)
-
     delta = solution[-1]
 
     def S(i, t):
@@ -89,7 +92,7 @@ def step_one(knots, basis, m, n, f):
         last_term = a0 if i == 0 else S(i - 1, knots[i])
         return sum(a[i, j] * (t - knots[i]) ** (j + 1) for j in range(m)) + last_term
 
-    return S, delta
+    return S, delta, a0, a
 
 
 # Compute the deviation between f and spline S at point t
@@ -240,10 +243,8 @@ def find_alternance_points(f, S, knots, n, global_max):
     if not all_alt_points:
         return np.array([]), np.array([]), 0.0
 
-    # Filter points that are within ALTERNANCE_TOL of the global maximum deviation
-    filtered = [
-        (t, d) for t, d in all_alt_points if abs(abs(d) - global_max) <= ALTERNANCE_TOL
-    ]
+    # Filter points that are within TOL of the global maximum deviation
+    filtered = [(t, d) for t, d in all_alt_points if abs(abs(d) - global_max) <= TOL]
 
     # Handle duplicates
     unique = []
@@ -277,9 +278,9 @@ def check_exit_1(f, S, knots, n, m, global_max):
         points = [(t, s) for t, s in pts_and_signs if (knots[i] <= t <= knots[i + 1])]
 
         if len(points) >= m + 2 and points_alternate(points):
-            print(
-                f"Condition (i) satisfied in interval {i} with {len(points)} alternance points."
-            )
+            # print(
+            #     f"Condition (i) satisfied in interval {i} with {len(points)} alternance points."
+            # )
             return True, pts, signs, (i, i)
 
     # Condition (ii)
@@ -328,9 +329,9 @@ def check_exit_1(f, S, knots, n, m, global_max):
             required = m * (j - i + 1) + 2
 
             if len(combined) >= required and points_alternate(combined):
-                print(
-                    f"Condition (ii) satisfied in intervals {i}-{j} with {len(combined)} alternance points"
-                )
+                # print(
+                #     f"Condition (ii) satisfied in intervals {i}-{j} with {len(combined)} alternance points"
+                # )
                 return (True, pts, signs, (i, j))
 
     return False, pts, signs, None
@@ -415,7 +416,6 @@ def plot_deviation(f, f_label, n, S, knots, basis, m, k, status):
             linestyle="-",
             label=f"Knots: {knot_label}" if j == 0 else None,
         )
-
     ax.set_xlabel("t")
     ax.set_ylabel(r"$f(t)-S(t)$")
     ax.set_title(
@@ -447,6 +447,53 @@ TEST_FUNCTIONS = {
 }
 
 
+def gra(f, knots, m):
+    n = len(knots) - 1
+
+    basis = step_zero(knots, m, n)
+    S, delta, a0, a = step_one(knots, basis, m, n, f)
+
+    optimal = False
+    exit_type = None
+
+    for _ in range(100):
+        (max_i, t_max, d_max), (min_i, t_min, d_min), (i_star, t_star, d_star) = (
+            find_extrema_overall(f, S, knots, n)
+        )
+
+        optimal, pts, signs, chain = check_exit_1(f, S, knots, n, m, abs(d_star))
+
+        if optimal:
+            exit_type = 1
+            break
+
+        new_basis = exchange(i_star, t_star, d_star, f, S, basis, knots, n)
+
+        if new_basis is None:
+            exit_type = 2
+            break
+
+        basis = new_basis
+        S, delta, a0, a = step_one(knots, basis, m, n, f)
+
+    # Final maximum absolute deviation
+    _, _, (i_star, t_star, d_star) = find_extrema_overall(f, S, knots, n)
+
+    return {
+        "a0": a0,
+        "coefficients": a,
+        "knots": knots,
+        "basis": basis,
+        "S": S,
+        "delta": delta,
+        "max_deviation": abs(d_star),
+        "t_star": t_star,
+        "optimal": optimal,
+        "exit_type": exit_type,
+        "alternance_points": pts,
+    }
+
+
 if __name__ == "__main__":
     function_name = "sin"
     f, f_label = TEST_FUNCTIONS[function_name]
@@ -457,53 +504,104 @@ if __name__ == "__main__":
     n = k + 1  # number of subintervals
 
     # Choose intial knots
-    knots = [2, 3.43177734, 6]  # differentiable at 3.43177734
+    candidate_knots = np.linspace(3.4, 3.5, 11)
+    results = []
 
-    # Choose initial basis
-    basis = step_zero(knots, m, n)
+    for internal_knot in candidate_knots:
+        knots = [2, internal_knot, 6]
 
-    # Construct polynomial spline S
-    S, delta = step_one(knots, basis, m, n, f)
+        result = gra(f, knots, m)
 
-    max_iterations = 100
+        a = result["coefficients"]
 
-    for _ in range(max_iterations):
+        left_deriv = a[0, 0] + 2 * a[0, 1] * (knots[1] - knots[0])
+        right_deriv = a[1, 0]
 
-        # Find extrema of current spline
-        (max_i, t_max, d_max), (min_i, t_min, d_min), (i_star, t_star, d_star) = (
-            find_extrema_overall(f, S, knots, n)
+        deriv_difference = right_deriv - left_deriv
+        differentiable = abs(deriv_difference) <= TOL
+
+        if differentiable:
+            print(f"Differentiable at internal knot {internal_knot}.")
+
+        results.append(
+            {
+                "function": function_name,
+                "optimal": result["optimal"],
+                "m": m,
+                "k": k,
+                "internal_knot": internal_knot,
+                "max_abs_deviation": result["max_deviation"],
+                "deriv_difference": deriv_difference,
+                "differentiable": abs(deriv_difference) <= TOL,
+                # "a0": np.round(result["a0"], 6),
+                # "coefficients": np.round(result["coefficients"], 6).tolist(),
+                # "t_star": np.round(result["t_star"], 6),
+                # "delta": np.round(result["delta"], 8),
+                # "basis": np.round(np.concatenate(result["basis"]), 6).tolist(),
+                # "alternance_points": np.round(result["alternance_points"], 6).tolist(),
+            }
         )
 
-        optimal, pts, signs, chain = check_exit_1(f, S, knots, n, m, abs(d_star))
+    # Write results to CSV
+    # with open(f"{function_name}_results.csv", "w", newline="") as file:
+    # writer = csv.DictWriter(
+    #     file,
+    #     fieldnames=results[0].keys(),
+    # )
 
-        if optimal:
-            print("EXIT 1 (spline is optimal).")
-            print("basis:            ", np.round(np.concatenate(basis), 6))
-            print("alternance points:", np.round(pts, 6))
+    # writer.writeheader()
+    # writer.writerows(results)
+
+    # find the pair where the derivative difference sign changes, use that as the initial interval for bisection, get midpoint, run algo, calculate derivative, check if differentiable, if not - keep the half where the sign change occurs
+
+    # find pair of internal knots where sign of derivative difference changes
+    left = None
+    right = None
+    left_diff = None
+    right_diff = None
+
+    for i in range(len(results) - 1):
+        r1 = results[i]
+        r2 = results[i + 1]
+
+        d1 = r1["deriv_difference"]
+        d2 = r2["deriv_difference"]
+
+        if d1 * d2 < 0:
+            left = r1["internal_knot"]
+            left_diff = d1
+            right = r2["internal_knot"]
+            right_diff = d2
             break
 
-        new_basis = exchange(i_star, t_star, d_star, f, S, basis, knots, n)
+    if left is None:
+        print("No pair of internal knots where the derivative difference changes sign")
+    else:
+        print(f"Bisection interval: [{left}, {right}]")
 
-        if new_basis is None:
-            print("EXIT 2 (no valid exchange).")
-            print("current basis:    ", np.round(np.concatenate(basis), 6))
-            print("alternance points:", np.round(pts, 6))
-            break
+        while right - left > TOL:
+            mid = (left + right) / 2
 
-        # Construct new spline
-        basis = new_basis
-        S, delta = step_one(knots, basis, m, n, f)
+            knots = [2, mid, 6]
+            result = gra(f, knots, m)
+            a = result["coefficients"]
+            left_deriv = a[0, 0] + 2 * a[0, 1] * (knots[1] - knots[0])
+            right_deriv = a[1, 0]
+            mid_diff = right_deriv - left_deriv
 
-    # final results
-    (max_i, t_max, d_max), (min_i, t_min, d_min), (i_star, t_star, d_star) = (
-        find_extrema_overall(f, S, knots, n)
-    )
+            print(
+                f"knot = {mid:.8f}, mid_diff = {mid_diff:.8f}, max abs deviation = {result['max_deviation']:.8f}"
+            )
 
-    print(f"Absolute deviation at basis points: {abs(delta):.5f}")
-    print(f"Maximum deviation: {d_max:.5f} at t = {t_max:.5f}")
-    print(f"Minimum deviation: {d_min:.5f} at t = {t_min:.5f}")
-    print(f"Maximum absolute deviation: " f"{d_star:.5f} at t = {t_star:.5f}")
+            if abs(mid_diff) <= TOL:
+                print(f"Differentiable at knot {mid:.8f}")
+                print(f"Max abs deviation: {result['max_deviation']:.8f}")
+                break
 
-    status = "Optimal" if optimal else "Not optimal"
-    plot_approximation(f, f_label, a, b, n, S, knots, basis, m, status)
-    plot_deviation(f, f_label, n, S, knots, basis, m, k, status)
+            # Keep the half containing the sign change
+            if left_diff * mid_diff < 0:
+                right = mid
+                right_diff = mid_diff
+            else:
+                left = mid
+                left_diff = mid_diff
