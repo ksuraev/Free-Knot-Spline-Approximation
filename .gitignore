@@ -3,3 +3,4 @@ notes.txt
 *.png
 __pycache__
 report/
+*.csv
