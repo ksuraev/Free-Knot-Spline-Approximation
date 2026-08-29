@@ -1,3 +1,5 @@
+# original algorithm
+
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -461,6 +463,7 @@ def gra(f, knots, m, n):
         "optimal": optimal,
         "exit_type": exit_type,
         "alternance_points": pts,
+        "chain": chain,
     }
 
 
@@ -479,7 +482,7 @@ if __name__ == "__main__":
     result = gra(f, knots, m, n)
 
     if result["exit_type"] == 1:
-        print("EXIT 1 (spline is optimal).")
+        print("EXIT 1 (spline is optimal). Chain: ", result["chain"])
     elif result["exit_type"] == 2:
         print("EXIT 2 (no valid exchange).")
 
