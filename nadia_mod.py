@@ -360,104 +360,105 @@ def gra(f, knots, m, n, fixed_left_value=None, fixed_right_value=None):
     }
 
 
-# 2nd numerical experiment from Poussin paper
 if __name__ == "__main__":
     function_name = "sin"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
-    # construct SP1 on [2, 6]
-    knots_1 = [2, 3.43177734, 6]
-    m = 2
-    n_1 = 2
-
-    result_1 = gra(f, knots_1, m, n_1)
-    print("Optimal:", result_1["optimal"])
-    print("S(1):", result_1["S"](0, 2))
-    print("Max abs deviation:", result_1["d_max"])
-    print("Basis:", result_1["basis"])
-
-    SP1 = result_1["S"]
-    fixed_value = SP1(0, 2)
-    print("SP1(2) =", fixed_value)
-
-    # GRAFT on [0, 2] with fixed right value SP1(2)
-    knots_2 = [0, 2]
-    n_2 = 1
-
-    result_2 = gra(f, knots_2, m, n_2, fixed_right_value=fixed_value)
-
-    print("Optimal:", result_2["optimal"])
-    print("Fixed value:", fixed_value)
-    print("S(2):", result_2["S"](0, 2))
-    print("Max abs deviation:", result_2["d_max"])
-    print("Basis:", result_2["basis"])
-
-    def combined_S(i, t):
-        if i == 0:
-            return result_2["S"](0, t)
-
-        return result_1["S"](i - 1, t)
-
-    combined_knots = result_2["knots"] + result_1["knots"][1:]
-    combined_basis = result_2["basis"] + result_1["basis"]
-
-    n = 3
+    a, b = 0, 6
     k = 2
+    m = 2
+    n = k + 1
 
-    status = "Optimal" if result_1["optimal"] and result_2["optimal"] else "Not optimal"
+    # Choose intial knots
+    knots = [0, 1.8, 4.7, 6]
+
+    print(f"Function: {function_name}")
+    print(f"Knots: {knots}")
+
+    result = gra(f, knots, m, n)
+
+    if result["exit_type"] == 1:
+        print("EXIT 1 (spline is optimal). Minimal chain: ", result["chain"])
+    elif result["exit_type"] == 2:
+        print("EXIT 2 (no valid exchange).")
+
+    print("basis:            ", result["basis"])
+    print("alternance points:", result["alternance_points"])
+    print(f"Max abs deviation: {result["d_max"]:.5f} at t = {result["t_star"]:.5f}")
+
+    status = "Optimal" if result["optimal"] else "Not optimal"
     nadia.plot(
         f,
         f_label,
-        0,
-        6,
+        a,
+        b,
         n,
-        combined_S,
-        combined_knots,
-        combined_basis,
+        result["S"],
+        knots,
+        result["basis"],
         m,
         k,
         status,
-        f"GRAFT_{function_name}_k{k}_m{m}.png",
+        f"mod_{function_name}_k{k}_m{m}.png",
     )
 
+
+# 2nd numerical experiment from Poussin paper
 # if __name__ == "__main__":
 #     function_name = "sin"
 #     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
-#     a, b = 0, 6
-#     k = 2
+#     # construct SP1 on [2, 6]
+#     knots_1 = [2, 3.43177734, 6]
 #     m = 2
-#     n = k + 1
+#     n_1 = 2
 
-#     # Choose intial knots
-#     knots = [0, 1.8, 4.5, 6]
+#     result_1 = gra(f, knots_1, m, n_1)
+#     print("Optimal:", result_1["optimal"])
+#     print("S(1):", result_1["S"](0, 2))
+#     print("Max abs deviation:", result_1["d_max"])
+#     print("Basis:", result_1["basis"])
 
-#     print(f"Function: {function_name}")
-#     print(f"Knots: {knots}")
+#     SP1 = result_1["S"]
+#     fixed_value = SP1(0, 2)
+#     print("SP1(2) =", fixed_value)
 
-#     result = gra(f, knots, m, n)
+#     # GRAFT on [0, 2] with fixed right value SP1(2)
+#     knots_2 = [0, 2]
+#     n_2 = 1
 
-#     if result["exit_type"] == 1:
-#         print("EXIT 1 (spline is optimal). Minimal chain: ", result["chain"])
-#     elif result["exit_type"] == 2:
-#         print("EXIT 2 (no valid exchange).")
+#     result_2 = gra(f, knots_2, m, n_2, fixed_right_value=fixed_value)
 
-#     print("basis:            ", result["basis"])
-#     print("alternance points:", result["alternance_points"])
-#     print(f"Max abs deviation: {result["d_max"]:.5f} at t = {result["t_star"]:.5f}")
+#     print("Optimal:", result_2["optimal"])
+#     print("Fixed value:", fixed_value)
+#     print("S(2):", result_2["S"](0, 2))
+#     print("Max abs deviation:", result_2["d_max"])
+#     print("Basis:", result_2["basis"])
 
-#     status = "Optimal" if result["optimal"] else "Not optimal"
+#     def combined_S(i, t):
+#         if i == 0:
+#             return result_2["S"](0, t)
+
+#         return result_1["S"](i - 1, t)
+
+#     combined_knots = result_2["knots"] + result_1["knots"][1:]
+#     combined_basis = result_2["basis"] + result_1["basis"]
+
+#     n = 3
+#     k = 2
+
+#     status = "Optimal" if result_1["optimal"] and result_2["optimal"] else "Not optimal"
 #     nadia.plot(
 #         f,
 #         f_label,
-#         a,
-#         b,
+#         0,
+#         6,
 #         n,
-#         result["S"],
-#         knots,
-#         result["basis"],
+#         combined_S,
+#         combined_knots,
+#         combined_basis,
 #         m,
 #         k,
 #         status,
-#         f"mod_{function_name}_k{k}_m{m}.png",
+#         f"GRAFT_{function_name}_k{k}_m{m}.png",
 #     )
