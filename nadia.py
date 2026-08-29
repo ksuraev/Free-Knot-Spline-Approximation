@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
+import test_functions
+
 TOL = 1e-5
 ALTERNANCE_TOL = 1e-5
 
@@ -10,19 +12,16 @@ def step_zero(knots, m, n):
     basis = []
 
     for i in range(n):
-        start = knots[i] if i == 0 else knots[i]
-        end = knots[i + 1] if i == n - 1 else knots[i + 1]
-
-        # count = m + 1 if i == 0 or i == n - 1 else m
-        # basis.append(np.linspace(start, end, count))
+        start = knots[i]
+        end = knots[i + 1]
 
         s = 0 if i == 0 else 1
         e = -1 if i == n - 1 else -2
         local_basis = np.linspace(start, end, m + 3)[s:e]
         basis.append(local_basis)
 
-    print([len(x) for x in basis])
-    print(basis)
+    # print([len(x) for x in basis])
+    # print(basis)
     return basis
 
 
@@ -89,7 +88,7 @@ def step_one(knots, basis, m, n, f):
         last_term = a0 if i == 0 else S(i - 1, knots[i])
         return sum(a[i, j] * (t - knots[i]) ** (j + 1) for j in range(m)) + last_term
 
-    return S, delta
+    return S, delta, a0, a
 
 
 # Compute the deviation between f and spline S at point t
@@ -336,35 +335,25 @@ def check_exit_1(f, S, knots, n, m, global_max):
     return False, pts, signs, None
 
 
-def plot_approximation(f, f_label, a, b, n, S, knots, basis, m, status):
-    fig, ax = plt.subplots(figsize=(10, 6))
+def plot(f, f_label, a, b, n, S, knots, basis, m, k, status, file_name):
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
 
     t = np.linspace(a, b, 1000)
-    ax.plot(t, f(t), color="slategrey", label=f_label)
+    ax1.plot(t, f(t), color="slategrey", label=f_label)
 
     for i in range(n):
         t_interval = np.linspace(knots[i], knots[i + 1])
-        ax.plot(
+        ax1.plot(
             t_interval,
             S(i, t_interval),
             color="dodgerblue",
             label="Spline approximation" if i == 0 else None,
         )
 
-    basis_label = ", ".join(f"{point:g}" for interval in basis for point in interval)
-    for i, interval_basis in enumerate(basis):
-        for j, point in enumerate(interval_basis):
-            ax.axvline(
-                point,
-                linestyle=":",
-                color="black",
-                label=f"Basis points: {basis_label}" if i == 0 and j == 0 else None,
-            )
-
     knot_label = ", ".join(f"{knot:g}" for knot in knots)
 
     for j, knot in enumerate(knots):
-        ax.axvline(
+        ax1.axvline(
             knot,
             color="red",
             lw=0.5,
@@ -372,35 +361,35 @@ def plot_approximation(f, f_label, a, b, n, S, knots, basis, m, status):
             label=f"Knots: {knot_label}" if j == 0 else None,
         )
 
-    ax.set_xlabel("t")
-    ax.set_title(
-        f"Degree-{m} spline approximation of {f_label} with {k} internal knots ({status})"
-    )
-    ax.legend(loc="lower center", bbox_to_anchor=(0.5, -0.3))
+    basis_label = ", ".join(f"{point:g}" for interval in basis for point in interval)
+    for i, interval_basis in enumerate(basis):
+        for j, point in enumerate(interval_basis):
+            ax1.axvline(
+                point,
+                linestyle=":",
+                color="black",
+                label=f"Basis points: {basis_label}" if i == 0 and j == 0 else None,
+            )
 
-    fig.tight_layout()
-    fig.savefig(f"{function_name}_k{k}_m{m}_approximation.png")
-    plt.show()
-
-
-def plot_deviation(f, f_label, n, S, knots, basis, m, k, status):
-    fig, ax = plt.subplots(figsize=(10, 6))
+    ax1.set_xlabel("t")
+    ax1.set_title("Spline approximation")
+    ax1.legend(loc="lower center", bbox_to_anchor=(0.5, -0.3))
 
     for i in range(n):
-        t_interval = np.linspace(knots[i], knots[i + 1], 1000)
+        t_interval = np.linspace(knots[i], knots[i + 1])
 
         d = np.array([deviation(f, S, i, t) for t in t_interval])
 
-        ax.plot(
+        ax2.plot(
             t_interval, d, color="slategray", label=r"$f(t)-S(t)$" if i == 0 else None
         )
 
-    ax.axhline(0)
+    ax2.axhline(0)
 
     basis_label = ", ".join(f"{point:g}" for interval in basis for point in interval)
     for i, interval_basis in enumerate(basis):
         for j, point in enumerate(interval_basis):
-            ax.axvline(
+            ax2.axvline(
                 point,
                 linestyle=":",
                 color="black",
@@ -408,7 +397,7 @@ def plot_deviation(f, f_label, n, S, knots, basis, m, k, status):
             )
     knot_label = ", ".join(f"{knot:g}" for knot in knots)
     for j, knot in enumerate(knots):
-        ax.axvline(
+        ax2.axvline(
             knot,
             color="red",
             lw=0.5,
@@ -416,40 +405,68 @@ def plot_deviation(f, f_label, n, S, knots, basis, m, k, status):
             label=f"Knots: {knot_label}" if j == 0 else None,
         )
 
-    ax.set_xlabel("t")
-    ax.set_ylabel(r"$f(t)-S(t)$")
-    ax.set_title(
-        f"Deviation for degree-{m} spline approximation of {f_label} with {k} internal knots ({status})"
+    ax2.set_xlabel("t")
+    ax2.set_ylabel(r"$f(t)-S(t)$")
+    ax2.set_title("Deviation")
+    ax2.legend(loc="lower center", bbox_to_anchor=(0.5, -0.3))
+
+    fig.suptitle(
+        f"Degree-{m} spline approximation of {f_label} with {k} internal knots ({status})"
     )
-    ax.legend(loc="lower center", bbox_to_anchor=(0.5, -0.3))
 
     fig.tight_layout()
-    fig.savefig(f"{function_name}_k{k}_m{m}_deviation.png")
+    fig.savefig(file_name)
     plt.show()
 
 
-def f_sin(t):
-    return np.sin(t)
+def gra(f, knots, m, n):
+    basis = step_zero(knots, m, n)
+    S, delta, a0, a = step_one(knots, basis, m, n, f)
 
+    optimal = False
+    exit_type = None
 
-def f_log(t):
-    return np.log(t + 1)
+    for _ in range(100):
+        (max_i, t_max, d_max), (min_i, t_min, d_min), (i_star, t_star, d_star) = (
+            find_extrema_overall(f, S, knots, n)
+        )
 
+        optimal, pts, signs, chain = check_exit_1(f, S, knots, n, m, abs(d_star))
 
-def f_log_sin(t):
-    return np.log(np.sin(t) + 3)
+        if optimal:
+            exit_type = 1
+            break
 
+        new_basis = exchange(i_star, t_star, d_star, f, S, basis, knots, n)
 
-TEST_FUNCTIONS = {
-    "sin": (f_sin, r"$\sin(t)$"),
-    "log": (f_log, r"$\log(t+1)$"),
-    "log_sin": (f_log_sin, r"$\log(\sin(t)+3)$"),
-}
+        if new_basis is None:
+            exit_type = 2
+            break
+
+        basis = new_basis
+        S, delta, a0, a = step_one(knots, basis, m, n, f)
+
+    # Final maximum absolute deviation
+    _, _, (i_star, t_star, d_star) = find_extrema_overall(f, S, knots, n)
+
+    return {
+        "a0": a0,
+        "coefficients": a,
+        "knots": knots,
+        "basis": basis,
+        "S": S,
+        "delta": delta,
+        "d_max": abs(d_star),
+        "t_star": t_star,
+        "optimal": optimal,
+        "exit_type": exit_type,
+        "alternance_points": pts,
+    }
 
 
 if __name__ == "__main__":
     function_name = "sin"
-    f, f_label = TEST_FUNCTIONS[function_name]
+    f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
     a, b = 2, 6
     k = 1  # number of internal fixed knots
@@ -459,51 +476,29 @@ if __name__ == "__main__":
     # Choose intial knots
     knots = [2, 3.43177734, 6]  # differentiable at 3.43177734
 
-    # Choose initial basis
-    basis = step_zero(knots, m, n)
+    result = gra(f, knots, m, n)
 
-    # Construct polynomial spline S
-    S, delta = step_one(knots, basis, m, n, f)
+    if result["exit_type"] == 1:
+        print("EXIT 1 (spline is optimal).")
+    elif result["exit_type"] == 2:
+        print("EXIT 2 (no valid exchange).")
 
-    max_iterations = 100
+    print("basis:            ", result["basis"])
+    print("alternance points:", result["alternance_points"])
+    print(f"Max abs deviation: {result["d_max"]:.5f} at t = {result["t_star"]:.5f}")
 
-    for _ in range(max_iterations):
-
-        # Find extrema of current spline
-        (max_i, t_max, d_max), (min_i, t_min, d_min), (i_star, t_star, d_star) = (
-            find_extrema_overall(f, S, knots, n)
-        )
-
-        optimal, pts, signs, chain = check_exit_1(f, S, knots, n, m, abs(d_star))
-
-        if optimal:
-            print("EXIT 1 (spline is optimal).")
-            print("basis:            ", np.round(np.concatenate(basis), 6))
-            print("alternance points:", np.round(pts, 6))
-            break
-
-        new_basis = exchange(i_star, t_star, d_star, f, S, basis, knots, n)
-
-        if new_basis is None:
-            print("EXIT 2 (no valid exchange).")
-            print("current basis:    ", np.round(np.concatenate(basis), 6))
-            print("alternance points:", np.round(pts, 6))
-            break
-
-        # Construct new spline
-        basis = new_basis
-        S, delta = step_one(knots, basis, m, n, f)
-
-    # final results
-    (max_i, t_max, d_max), (min_i, t_min, d_min), (i_star, t_star, d_star) = (
-        find_extrema_overall(f, S, knots, n)
+    status = "Optimal" if result["optimal"] else "Not optimal"
+    plot(
+        f,
+        f_label,
+        a,
+        b,
+        n,
+        result["S"],
+        knots,
+        result["basis"],
+        m,
+        k,
+        status,
+        f"orig_{function_name}_k{k}_m{m}.png",
     )
-
-    print(f"Absolute deviation at basis points: {abs(delta):.5f}")
-    print(f"Maximum deviation: {d_max:.5f} at t = {t_max:.5f}")
-    print(f"Minimum deviation: {d_min:.5f} at t = {t_min:.5f}")
-    print(f"Maximum absolute deviation: " f"{d_star:.5f} at t = {t_star:.5f}")
-
-    status = "Optimal" if optimal else "Not optimal"
-    plot_approximation(f, f_label, a, b, n, S, knots, basis, m, status)
-    plot_deviation(f, f_label, n, S, knots, basis, m, k, status)
