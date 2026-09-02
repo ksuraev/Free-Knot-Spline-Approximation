@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def calculate_polynomial(f, xnt, n):
+def calculate_polynomial(f, xn, n):
 
     # Initialise matrix A and vector b
     A = np.zeros((n + 2, n + 2))
@@ -101,11 +101,11 @@ def remez(f, a, b, n, tol=1e-6, max_iter=100):
     return P, e_max, xn
 
 
-def plot(f, P, xnt, a, b, n, plot_name):
+def plot(f, P, xn, a, b, n, plot_name):
     fig, ax = plt.subplots(figsize=(10, 6))
 
     # original function f(x)
-    x = np.arange(a, b, 0.01)
+    x = np.linspace(a, b, 1000)
     ax.plot(x, f(x), color="slategray", label="f(x)")
 
     # approximation polynomial P(x)

@@ -361,16 +361,16 @@ def gra(f, knots, m, n, fixed_left_value=None, fixed_right_value=None):
 
 
 if __name__ == "__main__":
-    function_name = "sin"
+    function_name = "sin3t"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
-    a, b = 0, 6
-    k = 2
+    a, b = 0, 4
+    k = 1
     m = 2
     n = k + 1
 
     # Choose intial knots
-    knots = [0, 1.8, 4.7, 6]
+    knots = [a, 2, b]
 
     print(f"Function: {function_name}")
     print(f"Knots: {knots}")
@@ -401,7 +401,6 @@ if __name__ == "__main__":
         status,
         f"mod_{function_name}_k{k}_m{m}.png",
     )
-
 
 # 2nd numerical experiment from Poussin paper
 # if __name__ == "__main__":
