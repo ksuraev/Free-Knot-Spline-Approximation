@@ -67,7 +67,7 @@ def exchange(xn, x_new, e_max, errors):
     return xn
 
 
-def remez(f, a, b, n, tol=1e-6, max_iter=100):
+def remez(f, a, b, n, tol=1e-6, max_iter=10000):
     # Guess initial n+2 points equidistantly spaced in the interval [a, b]
     xn = np.linspace(a, b, n + 2)
 

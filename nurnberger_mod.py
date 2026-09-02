@@ -38,7 +38,7 @@ def deviation(f, P, t):
 
 def find_local_abs_deviation_maxima(f, P, a, b, n_samples=10000):
     t_samples = np.linspace(a, b, n_samples)
-    d_samples = np.array([deviation(f, P, t) for t in t_samples])
+    d_samples = deviation(f, P, t_samples)
 
     abs_d_samples = np.abs(d_samples)
 
@@ -60,10 +60,10 @@ def find_local_abs_deviation_maxima(f, P, a, b, n_samples=10000):
     return [(t_samples[j], d_samples[j]) for j in indices]
 
 
-def find_alternance_points_in_interval(f, P, a, b):
+def find_alternance_points(f, P, a, b):
     extrema = find_local_abs_deviation_maxima(f, P, a, b)
     if not extrema:
-        return np.array([]), np.array([])
+        return np.array([])
 
     global_max = max(abs(d) for _, d in extrema)
 
@@ -88,7 +88,7 @@ def subroutine(f, function_name, x_i, b, degree, d_n, max_iter):
     if d_i <= d_n:
         return
 
-    # Set lower and upper bounds for x_max
+    # Set lower and upper bounds for x_bar
     x_l = x_i
     x_u = b
 
@@ -98,40 +98,45 @@ def subroutine(f, function_name, x_i, b, degree, d_n, max_iter):
 
         if x_u - x_l < 1e-5:
             break
-        elif d_i_max <= d_n + 1e-6:
+        elif d_i_max <= d_n + 1e-5:
             x_l = x_bar
         else:
             x_u = x_bar
+
         results.append(
             {
-                "x_i": x_i,
-                "b": b,
                 "d_n": d_n,
-                "x_l": x_l,
-                "x_u": x_u,
-                "x_bar": x_bar,
                 "d_i_max": d_i_max,
+                "x_l": x_l,
+                "x_bar": x_bar,
+                "x_u": x_u,
+                "x_l_dev": deviation(f, remez.remez(f, x_i, x_l, degree)[0], x_l),
+                "x_bar_dev": deviation(f, remez.remez(f, x_i, x_bar, degree)[0], x_bar),
+                "x_u_dev": deviation(f, remez.remez(f, x_i, x_u, degree)[0], x_u),
             }
         )
 
     x_max = x_l
-    d_at_x_max, alt_pts_remez = d(f, x_i, x_max, degree)
-    P, _, _ = remez.remez(f, x_i, x_max, degree)
-    alt_pts_find = find_alternance_points_in_interval(f, P, x_i, x_max)
 
-    print(f"Alt points from remez() in interval [{x_i, x_max}]: {alt_pts_remez}")
-    print(f"alt points from find() in interval [{x_i, x_max}] : {alt_pts_find}")
+    _, alt_pts_remez = d(f, x_i, x_max, degree)
+    P, _, _ = remez.remez(f, x_i, x_max, degree)
+    alt_pts_find = find_alternance_points(f, P, x_i, x_max)
+
+    print(f"Alt points from remez(): {alt_pts_remez}")
+    print(f"alt points from find() : {alt_pts_find}")
 
     x_min = alt_pts_find[degree + 1]
 
     for result in results:
-        result["x_max"] = x_max
         result["x_min"] = x_min
-        result["alternance_points"]: alt_pts_find
+        result["x_max"] = x_max
+        result["alternance_points_remez"] = alt_pts_remez
+        result["alternance_points_find"] = alt_pts_find
 
     with open(f"n_{function_name}_results.csv", "a", newline="") as file:
         writer = csv.DictWriter(file, fieldnames=results[0].keys())
-        writer.writeheader()
+        if file.tell() == 0:
+            writer.writeheader()
         writer.writerows(results)
 
     if x_max != x_min:
@@ -157,7 +162,7 @@ def run(f, function_name, a, b, k, degree, tolerance=1e-6, max_iter=10000):
 
         # Subroutine: solve d(x_i, x_bar) = d_n while knots can be placed
         for i in range(k):
-            x_min, x_max, alt_pts = subroutine(
+            x_min, x_max, _ = subroutine(
                 f, function_name, x_i, b, degree, d_n, max_iter
             )
             new_knots.append(x_min)
@@ -177,49 +182,29 @@ def run(f, function_name, a, b, k, degree, tolerance=1e-6, max_iter=10000):
         d_min = max(d_min, min(c_n, d_n))
         d_max = min(d_max, max(c_n, d_n))
 
-    return knots, d_min, d_max, alt_pts
+    return knots, d_min, d_max
 
 
-# find the overall maximum and minimum deviation across all intervals
-def find_extrema_overall(f, P, knots, n, n_samples=10000):
-    t_max = None
-    d_max = -np.inf
-    i_max = None
+def find_extrema_overall(f, polynomial):
+    all_extrema = []
 
-    t_min = None
-    d_min = np.inf
-    i_min = None
+    for i, (start, end, P) in enumerate(polynomial):
+        extrema = find_local_abs_deviation_maxima(
+            f,
+            P,
+            start,
+            end,
+        )
 
-    for i in range(n):
-        if i == 0:
-            t_samples = np.linspace(knots[i], knots[i + 1], n_samples)
-        else:
-            t_samples = np.linspace(knots[i], knots[i + 1], n_samples)[1:]
+        for t, dev in extrema:
+            all_extrema.append((i, t, dev))
 
-        d_samples = np.array([deviation(f, P, t) for t in t_samples])
-
-        idx_max = np.argmax(d_samples)
-        idx_min = np.argmin(d_samples)
-
-        # max signed deviation
-        if d_samples[idx_max] > d_max:
-            i_max, t_max, d_max = i, t_samples[idx_max], d_samples[idx_max]
-
-        # min signed deviation
-        if d_samples[idx_min] < d_min:
-            i_min, t_min, d_min = i, t_samples[idx_min], d_samples[idx_min]
-
-    # max absolute deviation
-    if abs(d_max) >= abs(d_min):
-        i_star, t_star, d_star = i_max, t_max, d_max
-    else:
-        i_star, t_star, d_star = i_min, t_min, d_min
-
-    return (
-        (i_max, t_max, d_max),
-        (i_min, t_min, d_min),
-        (i_star, t_star, d_star),
+    i_star, t_star, d_star = max(
+        all_extrema,
+        key=lambda item: abs(item[2]),
     )
+
+    return i_star, t_star, d_star
 
 
 def plot(f, f_label, polynomial, a, b, knots, alt_pts, m, k, file_name):
@@ -297,14 +282,14 @@ if __name__ == "__main__":
     k = 1  # number of free knots (not including a and b)
     m = 1  # degree of polynomial to fit
 
-    knots, d_min, d_max, alt_pts = run(f, function_name, a, b, k, m)
+    knots, d_min, d_max = run(f, function_name, a, b, k, m)
 
-    polynomial = []
     all_alt_pts = []
+    polynomial = []
     for i in range(len(knots) - 1):
         P, _, _ = remez.remez(f, knots[i], knots[i + 1], m)
         polynomial.append((knots[i], knots[i + 1], P))
-        alt_pts = find_alternance_points_in_interval(f, P, knots[i], knots[i + 1])
+        alt_pts = find_alternance_points(f, P, knots[i], knots[i + 1])
         all_alt_pts.extend(alt_pts)
 
     plot(
@@ -319,6 +304,23 @@ if __name__ == "__main__":
         k,
         f"n_{function_name}_k{k}_m{m}.png.png",
     )
+    i_star, t_star, d_star = find_extrema_overall(f, polynomial)
+
+    print(f"Overall extrema: i_star={i_star}, t_star={t_star}, d_star={d_star}")
+    # pts = [
+    #     3.14191269,
+    #     6.28262527,
+    #     7.33032954,
+    #     8.37803381,
+    #     9.42453796,
+    #     10.47224223,
+    #     11.51874638,
+    # ]
+    # for pt in pts:
+    #     for start, end, P in polynomial:
+    #         if start <= pt <= end:
+    #             print(f"Deviation at {pt}: {deviation(f, P, pt)}")
+    #             break
 
     # knots, d_min, d_max = run(f, a, b, k, m, True)
     # print(f"Last alt pt knots: {knots}. Max and min d: {d_max:.8f}, {d_min:.8f}")
