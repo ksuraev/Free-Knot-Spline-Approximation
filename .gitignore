@@ -5,3 +5,4 @@ __pycache__
 report/
 *.csv
 ignore/
+.DS_Store
