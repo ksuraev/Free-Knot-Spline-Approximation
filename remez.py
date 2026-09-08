@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
+import test_functions
+
 
 def calculate_polynomial(f, xn, n):
 
@@ -123,13 +125,12 @@ def plot(f, P, xn, a, b, n, plot_name):
 
 
 if __name__ == "__main__":
+    function_name = "cos_weird"
+    f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
-    def f(x):
-        return np.sin(x)
-
-    a, b = 0, 4
-    n = 2
+    a, b = 0, 2 * np.pi
+    n = 1
     P, e_max, xn = remez(f, a, b, n)
     print(f"Max error: {e_max}")
     print(f"Alternance points: {xn}")
-    # plot(f, P, xn, a, b, n, "remez.png")
+    plot(f, P, xn, a, b, n, "remez.png")

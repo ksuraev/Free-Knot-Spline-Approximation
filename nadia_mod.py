@@ -1,7 +1,10 @@
 # Modified exchange() to allow basis point to be replaced by internal knot and fixed tails
+import matplotlib.pyplot as plt
 import numpy as np
 
 import nadia
+import nurnberger_mod as nurnberger
+import remez
 import test_functions
 
 TOL = 1e-5
@@ -119,12 +122,12 @@ def exchange(i, t_star, d_star, f, S, basis, knots, n):
         if abs(t_star - knots[j]) <= TOL:
             knot_index = j
             t_star = knots[j]
-            print(f"t* is an internal knot at {t_star} with sign {t_star_sign}")
+            # print(f"t* is an internal knot at {t_star} with sign {t_star_sign}")
             break
 
     # t* cannot be a basis point
     if any(np.any(np.isclose(b, t_star)) for b in basis):
-        print(f"t*={t_star} is already a basis point in interval {i}")
+        print(f"EXIT 2: t*={t_star} is already a basis point in interval {i}")
         return None
 
     # Internal knot: look in both adjacent intervals
@@ -149,7 +152,7 @@ def exchange(i, t_star, d_star, f, S, basis, knots, n):
             t_tilde = right_pt
 
         else:
-            print("No valid basis point to replace")
+            print("EXIT 2: No valid basis point to replace")
             return None
 
     # Normal point: look only in current interval
@@ -178,7 +181,7 @@ def exchange(i, t_star, d_star, f, S, basis, knots, n):
             t_tilde = right_pt
 
         if t_tilde is None:
-            print("no valid basis point to replace")
+            print("EXIT 2: no valid basis point to replace")
             return None
 
     # replace basis point t_tilde with t_star in interval i
@@ -190,7 +193,7 @@ def exchange(i, t_star, d_star, f, S, basis, knots, n):
 
     if abs(d_star) <= max_basis_deviation + TOL:
         print(
-            f"Absolute deviation at t*, {d_star} is <= max absolute deviation at basis points in interval {i}, {np.max(np.abs(basis_deviations))}"
+            f"EXIT 2: Absolute deviation at t*, {abs(d_star)} is <= max absolute deviation at basis points in interval {i}, {np.max(np.abs(basis_deviations)) + TOL}"
         )
         return None
 
@@ -232,9 +235,9 @@ def check_exit_1(
             required -= 1
 
         if len(points) >= required and points_alternate(points):
-            print(
-                f"Condition (i) satisfied in interval {i} with {len(points)} alternance points."
-            )
+            # print(
+            #     f"Condition (i) satisfied in interval {i} with {len(points)} alternance points."
+            # )
             return True, pts, signs, (i, i)
 
     # condition (ii)
@@ -295,10 +298,10 @@ def check_exit_1(
             if fixed_right_tail and j == n - 1:
                 total_required -= 1
             if len(combined) >= total_required and points_alternate(combined):
-                print(
-                    f"Condition (ii) satisfied in intervals {i}-{j} with {len(combined)} alternance points"
-                )
-                return (True, pts, signs, (i, j))
+                # print(
+                #     f"Condition (ii) satisfied in intervals {i}-{j} with {len(combined)} alternance points"
+                # )
+                return True, pts, signs, (i, j)
 
     return False, pts, signs, None
 
@@ -315,6 +318,10 @@ def gra(f, knots, m, n, fixed_left_value=None, fixed_right_value=None):
 
     optimal = False
     exit_type = None
+
+    exit_i_star = None
+    exit_t_star = None
+    exit_d_star = None
 
     for _ in range(100):
         (max_i, t_max, d_max), (min_i, t_min, d_min), (i_star, t_star, d_star) = (
@@ -334,6 +341,9 @@ def gra(f, knots, m, n, fixed_left_value=None, fixed_right_value=None):
 
         if new_basis is None:
             exit_type = 2
+            exit_i_star = i_star
+            exit_t_star = t_star
+            exit_d_star = d_star
             break
 
         basis = new_basis
@@ -352,25 +362,83 @@ def gra(f, knots, m, n, fixed_left_value=None, fixed_right_value=None):
         "S": S,
         "delta": delta,
         "d_max": abs(d_star),
+        "i_star": i_star,
         "t_star": t_star,
         "optimal": optimal,
         "exit_type": exit_type,
         "alternance_points": pts,
         "chain": chain,
+        "exit_t_star": exit_t_star,
+        "exit_i_star": exit_i_star,
+        "exit_d_star": exit_d_star,
     }
 
 
+# def kate(f, function_name, a, b, m, k, n):
+#     knots, x_min, x_max, d = nurnberger.discontinuous_spline(
+#         f, function_name, a, b, k, m
+#     )
+
+#     result = gra(f, knots, m, n)
+
+#     print(f"d_min: {d}, d_max: {result['d_max']}")
+
+#     t_min = x_min
+#     t_max = x_max
+
+#     P1, _, _ = remez.remez(f, a, t_min, m)
+
+#     d_min = d
+#     d_max = result["d_max"]
+
+#     result = gra(f, [t_min, b], m, 1, fixed_left_value=P1(t_min))
+#     d_new_min = result["d_max"]
+#     result = gra(f, [t_max, b], m, 1, fixed_left_value=P1(t_max))
+#     d_new_max = result["d_max"]
+
+#     if abs(d_new_min - d_min) < 1e-5:
+#         return t_min
+#     if abs(d_new_max - d_min) < 1e-5:
+#         return t_max
+
+#     if d_new_min > d_min and d_new_max < d_min:
+
+#         for _ in range(100):
+
+#             if t_max - t_min < 1e-5:
+#                 break
+
+#             # d_k = (d_min * d_max) ** 0.5
+#             t_k = (t_min + t_max) / 2
+
+#             result = gra(f, [t_k, b], m, 1, fixed_left_value=P1(t_k))
+#             d_new = result["d_max"]
+
+#             if abs(d_new - d_min) < 1e-5:
+#                 return t_k
+#             if d_new > d_min:
+#                 t_min = t_k
+#             elif d_new < d_min:
+#                 t_max = t_k
+
+# knot must be between a and x_min or maybe knot
+# if t_k < x_min:
+#     knots = [a, t_k, b]
+#     result = gra(f, knots, m, n)
+
+
 if __name__ == "__main__":
-    function_name = "sin3t"
+    function_name = "cos_if_else"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
-    a, b = 0, 4
+    a, b = 0, 12
     k = 1
-    m = 2
+    m = 1
     n = k + 1
 
     # Choose intial knots
-    knots = [a, 2, b]
+    internal_knot = 10.26
+    knots = [a, internal_knot, b]
 
     print(f"Function: {function_name}")
     print(f"Knots: {knots}")
@@ -399,13 +467,14 @@ if __name__ == "__main__":
         m,
         k,
         status,
-        f"mod_{function_name}_k{k}_m{m}.png",
+        f"spline_{function_name}_a{a}_b{b}_knot_{internal_knot}.png",
     )
 
-# 2nd numerical experiment from Poussin paper
-# if __name__ == "__main__":
-#     function_name = "sin"
-#     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
+
+# # 2nd numerical experiment from Poussin paper
+# # if __name__ == "__main__":
+# #     function_name = "sin"
+# #     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
 #     # construct SP1 on [2, 6]
 #     knots_1 = [2, 3.43177734, 6]

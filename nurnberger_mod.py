@@ -7,7 +7,7 @@ import numpy as np
 import remez
 import test_functions
 
-ALTERNANCE_TOL = 1e-5
+ALTERNANCE_TOL = 1e-4
 
 
 def d(f, a, b, degree):
@@ -110,9 +110,9 @@ def subroutine(f, function_name, x_i, b, degree, d_n, max_iter):
                 "x_l": x_l,
                 "x_bar": x_bar,
                 "x_u": x_u,
-                "x_l_dev": deviation(f, remez.remez(f, x_i, x_l, degree)[0], x_l),
-                "x_bar_dev": deviation(f, remez.remez(f, x_i, x_bar, degree)[0], x_bar),
-                "x_u_dev": deviation(f, remez.remez(f, x_i, x_u, degree)[0], x_u),
+                # "x_l_dev": deviation(f, remez.remez(f, x_i, x_l, degree)[0], x_l),
+                # "x_bar_dev": deviation(f, remez.remez(f, x_i, x_bar, degree)[0], x_bar),
+                # "x_u_dev": deviation(f, remez.remez(f, x_i, x_u, degree)[0], x_u),
             }
         )
 
@@ -145,9 +145,37 @@ def subroutine(f, function_name, x_i, b, degree, d_n, max_iter):
     return x_min, x_max, alt_pts_find
 
 
-def run(f, function_name, a, b, k, degree, tolerance=1e-6, max_iter=10000):
+def find_max_deviation_overall(f, polynomial):
+    all_extrema = []
+
+    for i, (start, end, P) in enumerate(polynomial):
+        extrema = find_local_abs_deviation_maxima(
+            f,
+            P,
+            start,
+            end,
+        )
+
+        for t, dev in extrema:
+            all_extrema.append((i, t, dev))
+
+    i_star, t_star, d_star = max(
+        all_extrema,
+        key=lambda item: abs(item[2]),
+    )
+
+    return i_star, t_star, d_star
+
+
+def discontinuous_spline(
+    f, function_name, a, b, k, degree, tolerance=1e-6, max_iter=10000
+):
     """Run the Nurnberger algorithm to find the optimal placement of k free knots in the interval [a,b] for polynomial approximation of degree 'degree'."""
     knots, d_min, d_max = step_zero(f, a, b, k, degree)
+
+    x_min = None
+    x_max = None
+    d_n = None
 
     for iteration in range(max_iter):
         if abs(d_max - d_min) < tolerance * d_max:
@@ -182,29 +210,7 @@ def run(f, function_name, a, b, k, degree, tolerance=1e-6, max_iter=10000):
         d_min = max(d_min, min(c_n, d_n))
         d_max = min(d_max, max(c_n, d_n))
 
-    return knots, d_min, d_max
-
-
-def find_extrema_overall(f, polynomial):
-    all_extrema = []
-
-    for i, (start, end, P) in enumerate(polynomial):
-        extrema = find_local_abs_deviation_maxima(
-            f,
-            P,
-            start,
-            end,
-        )
-
-        for t, dev in extrema:
-            all_extrema.append((i, t, dev))
-
-    i_star, t_star, d_star = max(
-        all_extrema,
-        key=lambda item: abs(item[2]),
-    )
-
-    return i_star, t_star, d_star
+    return knots, x_min, x_max, d_n
 
 
 def plot(f, f_label, polynomial, a, b, knots, alt_pts, m, k, file_name):
@@ -271,7 +277,7 @@ def plot(f, f_label, polynomial, a, b, knots, alt_pts, m, k, file_name):
 
 if __name__ == "__main__":
 
-    function_name = "cos_if_else"
+    function_name = "cos_weird"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
     file_name = f"n_{function_name}_results.csv"
@@ -282,7 +288,7 @@ if __name__ == "__main__":
     k = 1  # number of free knots (not including a and b)
     m = 1  # degree of polynomial to fit
 
-    knots, d_min, d_max = run(f, function_name, a, b, k, m)
+    knots, x_min, x_max, d_n = discontinuous_spline(f, function_name, a, b, k, m)
 
     all_alt_pts = []
     polynomial = []
@@ -291,6 +297,8 @@ if __name__ == "__main__":
         polynomial.append((knots[i], knots[i + 1], P))
         alt_pts = find_alternance_points(f, P, knots[i], knots[i + 1])
         all_alt_pts.extend(alt_pts)
+
+    print("all alt pts:", all_alt_pts)
 
     plot(
         f,
@@ -302,11 +310,14 @@ if __name__ == "__main__":
         all_alt_pts,
         m,
         k,
-        f"n_{function_name}_k{k}_m{m}.png.png",
+        f"n_{function_name}_a{a}_b{b}_knot{knots[1]:.5f}_k{k}_m{m}.png",
     )
-    i_star, t_star, d_star = find_extrema_overall(f, polynomial)
+    i_star, t_star, d_star = find_max_deviation_overall(f, polynomial)
 
-    print(f"Overall extrema: i_star={i_star}, t_star={t_star}, d_star={d_star}")
+    print(f"Max deviation: i_star={i_star}, t_star={t_star}, d_star={d_star}")
+
+    # print(f"deviation at 0: {deviation(f, polynomial[0][2], 0)}")
+
     # pts = [
     #     3.14191269,
     #     6.28262527,
