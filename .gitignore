@@ -6,3 +6,6 @@ report/
 *.csv
 ignore/
 .DS_Store
+old_csv/
+old_plots/
+plots
