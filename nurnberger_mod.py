@@ -122,22 +122,22 @@ def subroutine(f, function_name, x_i, b, degree, d_n, max_iter):
     P, _, _ = remez.remez(f, x_i, x_max, degree)
     alt_pts_find = find_alternance_points(f, P, x_i, x_max)
 
-    print(f"Alt points from remez(): {alt_pts_remez}")
-    print(f"alt points from find() : {alt_pts_find}")
+    # print(f"Alt points from remez(): {alt_pts_remez}")
+    # print(f"alt points from find() : {alt_pts_find}")
 
     x_min = alt_pts_find[degree + 1]
 
-    for result in results:
-        result["x_min"] = x_min
-        result["x_max"] = x_max
-        result["alternance_points_remez"] = alt_pts_remez
-        result["alternance_points_find"] = alt_pts_find
+    # for result in results:
+    #     result["x_min"] = x_min
+    #     result["x_max"] = x_max
+    #     result["alternance_points_remez"] = alt_pts_remez
+    #     result["alternance_points_find"] = alt_pts_find
 
-    with open(f"n_{function_name}_results.csv", "a", newline="") as file:
-        writer = csv.DictWriter(file, fieldnames=results[0].keys())
-        if file.tell() == 0:
-            writer.writeheader()
-        writer.writerows(results)
+    # with open(f"n_{function_name}_results.csv", "a", newline="") as file:
+    #     writer = csv.DictWriter(file, fieldnames=results[0].keys())
+    #     if file.tell() == 0:
+    #         writer.writeheader()
+    #     writer.writerows(results)
 
     if x_max != x_min:
         print(f"x_min: {x_min}, x_max: {x_max}")

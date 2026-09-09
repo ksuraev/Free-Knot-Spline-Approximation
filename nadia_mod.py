@@ -152,7 +152,7 @@ def exchange(i, t_star, d_star, f, S, basis, knots, n):
             t_tilde = right_pt
 
         else:
-            print("EXIT 2: No valid basis point to replace")
+            print("EXIT 2 (internal knot): No valid basis point to replace")
             return None
 
     # Normal point: look only in current interval
@@ -180,6 +180,22 @@ def exchange(i, t_star, d_star, f, S, basis, knots, n):
         ):
             t_tilde = right_pt
 
+        # for a single interval, allow exchange with basis point at opposite end of interval if it has same sign as t*
+        if t_tilde is None and n == 1:
+            if t_star < basis_points[0]:
+                end_pt = basis_points[-1]
+
+            elif t_star > basis_points[-1]:
+                end_pt = basis_points[0]
+
+            else:
+                end_pt = None
+
+            if (
+                end_pt is not None
+                and np.sign(nadia.deviation(f, S, i, end_pt)) == t_star_sign
+            ):
+                t_tilde = end_pt
         if t_tilde is None:
             print("EXIT 2: no valid basis point to replace")
             return None

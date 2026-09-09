@@ -56,7 +56,7 @@ def fixed_right_tail(f, a, theta, b, m, n):
     }
 
 
-def psi(f, a, b, theta, m, n):
+def psi_with_swap(f, a, b, theta, m, n):
     two_int_chain = nadia_mod.gra(f, [a, theta, b], m, n)
 
     # Case 1: found optimal spline across two intervals
@@ -75,38 +75,88 @@ def psi(f, a, b, theta, m, n):
     # Case 2: tried to replace basis point in 1st interval
     # Start with [a, theta] as minimal chain
     if exit_interval == 0:
-        fixed = fixed_left_tail(f, a, theta, b, m, n)
+        fixed_left = fixed_left_tail(f, a, theta, b, m, n)
 
         # [a, theta] is wrong choice for minimal chain, swap to [theta, b]
-        if abs(fixed["gra_d_max"]) > abs(fixed["d_max"]) + 1e-4:
+        if abs(fixed_left["gra_d_max"]) > abs(fixed_left["d_max"]) + 1e-1:
             print(
-                f"case 2: d_max={fixed['d_max']:.10f} < gra_d_max={fixed['gra_d_max']:.10f} at theta={theta:.10f}"
+                f"case 2: d_max={fixed_left['d_max']:.10f} < gra_d_max={fixed_left['gra_d_max']:.10f} at theta={theta:.10f}"
             )
-            return fixed_right_tail(f, a, theta, b, m, n)
+            fixed_right = fixed_right_tail(f, a, theta, b, m, n)
+            fixed_right_diff = abs(fixed_right["gra_d_max"] - fixed_right["d_max"])
+            fixed_left_diff = abs(fixed_left["gra_d_max"] - fixed_left["d_max"])
+            if fixed_right_diff < fixed_left_diff:
+                print(
+                    f"case 2a: fixed_right_diff={fixed_right_diff:.10f} < fixed_left_diff={fixed_left_diff:.10f} at theta={theta:.10f}"
+                )
+                return fixed_right
+            # if abs(fixed_right["gra_d_max"]) > abs(fixed_right["d_max"]) + 1e-1:
+            #     print(
+            #         f"case 2a: d_max={fixed_right['d_max']:.10f} < gra_d_max={fixed_right['gra_d_max']:.10f} at theta={theta:.10f}"
+            #     )
+            #     return fixed_right
 
-        return fixed
+        return fixed_left
 
     # Case 3: tried to replace basis point in 2nd interval
     # Start with [theta, b] as minimal chain
-    fixed = fixed_right_tail(f, a, theta, b, m, n)
+    fixed_right = fixed_right_tail(f, a, theta, b, m, n)
 
     # [theta, b] is wrong choice for minimal chain, swap to [a, theta]
-    if abs(fixed["gra_d_max"]) > abs(fixed["d_max"]) + 1e-4:
+    if abs(fixed_right["gra_d_max"]) > abs(fixed_right["d_max"]) + 1e-1:
         print(
-            f"case 3: d_max={fixed['d_max']:.10f} < gra_d_max={fixed['gra_d_max']:.10f} at theta={theta:.10f}"
+            f"case 3: d_max={fixed_right['d_max']:.10f} < gra_d_max={fixed_right['gra_d_max']:.10f} at theta={theta:.10f}"
         )
+        fixed_left = fixed_left_tail(f, a, theta, b, m, n)
+        fixed_left_diff = abs(fixed_left["gra_d_max"] - fixed_left["d_max"])
+        fixed_right_diff = abs(fixed_right["gra_d_max"] - fixed_right["d_max"])
+        if fixed_left_diff < fixed_right_diff:
+            print(
+                f"case 3a: fixed_left_diff={fixed_left_diff:.10f} < fixed_right_diff={fixed_right_diff:.10f} at theta={theta:.10f}"
+            )
+            return fixed_left
+        # if abs(fixed_left["gra_d_max"]) > abs(fixed_left["d_max"]) + 1e-1:
+        #     print(
+        #         f"case 3a: d_max={fixed_left['d_max']:.10f} < gra_d_max={fixed_left['gra_d_max']:.10f} at theta={theta:.10f}"
+        #     )
+        #     return fixed_left
+
+    return fixed_right
+
+
+def psi_without_swap(f, a, b, theta, m, n):
+    two_int_chain = nadia_mod.gra(f, [a, theta, b], m, n)
+
+    # Case 1: found optimal spline across two intervals
+    if two_int_chain["exit_type"] == 1:
+        return {
+            "d_max": two_int_chain["d_max"],
+            "case": 1,
+            "S": two_int_chain["S"],
+            "basis": two_int_chain["basis"],
+            "knots": [a, theta, b],
+            "optimal": True,
+        }
+
+    exit_interval = two_int_chain["exit_i_star"]
+
+    # Case 2: tried to replace basis point in 1st interval
+    # [a, theta] as minimal chain
+    if exit_interval == 0:
         return fixed_left_tail(f, a, theta, b, m, n)
 
-    return fixed
+    # Case 3: tried to replace basis point in 2nd interval
+    # [theta, b] as minimal chain
+    return fixed_right_tail(f, a, theta, b, m, n)
 
 
-def directional_derivative(f, a, b, theta, psi_theta, m, n, h):
+def directional_derivative(f, a, b, theta, psi_theta, m, n, h, psi=psi_with_swap):
     psi_theta_h = psi(f, a, b, theta + h, m, n)["d_max"]
 
     return (psi_theta_h - psi_theta) / abs(h)
 
 
-def armijo(f, a, b, theta, psi_theta, m, n, g, d, rho=0.5, c=0.1):
+def armijo(f, a, b, theta, psi_theta, m, n, g, d, rho=0.5, c=0.1, psi=psi_with_swap):
     if d < 0:
         alpha = a - theta / d
     else:
@@ -134,7 +184,19 @@ def armijo(f, a, b, theta, psi_theta, m, n, g, d, rho=0.5, c=0.1):
 
 
 def opt(
-    f, a, b, m, n, x_min, x_max, h=0.1, rho=0.5, c=0.1, tolerance=1e-5, max_iter=100
+    f,
+    a,
+    b,
+    m,
+    n,
+    x_min,
+    x_max,
+    h=0.1,
+    rho=0.5,
+    c=0.1,
+    tolerance=1e-5,
+    max_iter=30,
+    psi=psi_with_swap,
 ):
     theta = x_min
 
@@ -165,13 +227,27 @@ def opt(
             break
 
         theta = theta_next
+    else:
+        print("Maximum iterations reached in opt()")
 
     psi_opt = psi(f, a, b, theta, m, n)
 
     return theta, psi_opt
 
 
-def plot_psi(f, f_label, a, b, m, n, theta_start, theta_end, file_name, step=0.02):
+def plot_psi(
+    f,
+    f_label,
+    a,
+    b,
+    m,
+    n,
+    theta_start,
+    theta_end,
+    file_name,
+    step=0.05,
+    psi=psi_with_swap,
+):
     thetas = np.arange(theta_start, theta_end, step)
 
     psi_values = []
@@ -198,22 +274,28 @@ def plot_psi(f, f_label, a, b, m, n, theta_start, theta_end, file_name, step=0.0
 
     plt.xlabel(r"$\theta$")
     plt.ylabel(r"$\psi(\theta)$")
-    plt.title(r"$\psi(\theta)$ for " + f"{f_label} with m={m}, k={k}")
+
+    if "with_swap" in str(file_name):
+        plt.title(r"$\psi(\theta)$ for " + f"{f_label} with m={m}, k={k} (with swap)")
+    else:
+        plt.title(
+            r"$\psi(\theta)$ for " + f"{f_label} with m={m}, k={k} (without swap)"
+        )
 
     plt.grid(alpha=0.3)
-    plt.legend()
+    plt.legend(loc="lower center", bbox_to_anchor=(0.5, -0.3))
     plt.tight_layout()
 
-    plt.savefig(file_name)
+    plt.savefig(file_name, dpi=300)
     plt.show()
 
 
 if __name__ == "__main__":
-    function_name = "sin3t"
+    function_name = "sin"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
     a = 0
-    b = 6
+    b = 12
 
     k = 1
     n = k + 1
@@ -228,30 +310,60 @@ if __name__ == "__main__":
 
     print("Knots:", knots)
     print("x_min:", x_min)
+    print("x_max:", x_max)
     print("d_n:", d_n)
+
+    # fixed_tail = nadia_mod.gra(f, [a, 5.8], m, 1, fixed_right_value=0)
+
+    # print(
+    #     f"basis: {fixed_tail['basis']}, d_max: {fixed_tail['d_max']:.10f}, optimal: {fixed_tail['optimal'], fixed_tail['exit_t_star']}"
+    # )
 
     start_theta = a + 0.1
     end_theta = b - 0.1
 
-    psi_plot_file = (
+    # psi plot with swap
+    plot_psi(
+        f,
+        f_label,
+        a,
+        b,
+        m,
+        n,
+        start_theta,
+        end_theta,
         plot_dir
-        / f"psi_{function_name}_a{a}_b{b}_s{start_theta}_e{end_theta}_k{k}_m{m}.png"
+        / f"PSI_{function_name}_a{a}_b{b}_s{start_theta}_e{end_theta}_k{k}_m{m}_with_swap.png",
     )
 
-    plot_psi(f, f_label, a, b, m, n, start_theta, end_theta, psi_plot_file, 0.04)
+    # # psi plot without swap
+    # plot_psi(
+    #     f,
+    #     f_label,
+    #     a,
+    #     b,
+    #     m,
+    #     n,
+    #     start_theta,
+    #     end_theta,
+    #     plot_dir
+    #     / f"psi_{function_name}_a{a}_b{b}_s{start_theta}_e{end_theta}_k{k}_m{m}_without_swap.png",
+    #     psi=psi_without_swap,
+    # )
 
-    # theta_opt, psi_result = opt(f, a, b, m, n, 3.68, x_max)
+    # psi with swap
+    # theta_opt, psi_result = opt(f, a, b, m, n, 2.6, x_max)
 
-    # print("Optimal theta:", theta_opt)
-    # print("psi(theta):", psi_result["d_max"])
-    # print("psi case:", psi_result["case"])
+    # print(
+    #     f"optimal theta: {theta_opt:.10f}, psi(theta_opt): {psi_result['d_max']:.10f}"
+    # )
 
     # case = (
     #     "fixed left"
     #     if psi_result["case"] == 2
     #     else "fixed right" if psi_result["case"] == 3 else "two intervals"
     # )
-
+    # status = f"optimal, {case}" if psi_result["optimal"] else f"not optimal, {case}"
     # nadia.plot(
     #     f,
     #     f_label,
@@ -263,7 +375,41 @@ if __name__ == "__main__":
     #     psi_result["basis"],
     #     m,
     #     k,
-    #     (f"optimal, {case}" if psi_result["optimal"] else f"not optimal, {case}"),
+    #     psi_result["d_max"],
+    #     status,
     #     plot_dir
-    #     / f"{function_name}_a{a}_b{b}_knot{theta_opt:.5f}_k{k}_m{m}_psi(t){psi_result["d_max"]:.5f}.png",
+    #     / f"{function_name}_a{a}_b{b}_knot{theta_opt:.5f}_k{k}_m{m}_psi(t){psi_result["d_max"]:.5f}_with_swap.png",
+    #     f"Degree-{m} spline approximation of {f_label}. {k} internal knots ({status}). Max abs deviation: {psi_result["d_max"]:.5f} (with swap)",
     # )
+
+    # # # psi without swap
+    # # theta_opt, psi_result = opt(f, a, b, m, n, 4.74, x_max, psi=psi_without_swap)
+
+    # # print(
+    # #     f"optimal theta: {theta_opt:.10f}, psi(theta_opt): {psi_result['d_max']:.10f}"
+    # # )
+
+    # # case = (
+    # #     "fixed left"
+    # #     if psi_result["case"] == 2
+    # #     else "fixed right" if psi_result["case"] == 3 else "two intervals"
+    # # )
+
+    # # status = f"optimal, {case}" if psi_result["optimal"] else f"not optimal, {case}"
+    # # nadia.plot(
+    # #     f,
+    # #     f_label,
+    # #     a,
+    # #     b,
+    # #     n,
+    # #     psi_result["S"],
+    # #     psi_result["knots"],
+    # #     psi_result["basis"],
+    # #     m,
+    # #     k,
+    # #     psi_result["d_max"],
+    # #     status,
+    # #     plot_dir
+    # #     / f"{function_name}_a{a}_b{b}_knot{theta_opt:.5f}_k{k}_m{m}_psi(t){psi_result["d_max"]:.5f}_without_swap.png",
+    # #     f"Degree-{m} spline approximation of {f_label}. {k} internal knots ({status}). Max abs deviation: {psi_result["d_max"]:.5f} (without swap)",
+    # # )

@@ -337,8 +337,10 @@ def check_exit_1(f, S, knots, n, m, global_max):
     return False, pts, signs, None
 
 
-def plot(f, f_label, a, b, n, S, knots, basis, m, k, status, file_name):
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+def plot(
+    f, f_label, a, b, n, S, knots, basis, m, k, d_max, status, file_name, suptitle=None
+):
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7))
 
     t = np.linspace(a, b, 1000)
     ax1.plot(t, f(t), color="slategrey", label=f_label)
@@ -412,9 +414,12 @@ def plot(f, f_label, a, b, n, S, knots, basis, m, k, status, file_name):
     ax2.set_title("Deviation")
     ax2.legend(loc="lower center", bbox_to_anchor=(0.5, -0.3))
 
-    fig.suptitle(
-        f"Degree-{m} spline approximation of {f_label} with {k} internal knots ({status})"
-    )
+    if suptitle is None:
+        fig.suptitle(
+            f"Degree-{m} spline approximation of {f_label}. {k} internal knots ({status}). Max abs deviation: {d_max:.5f}"
+        )
+    else:
+        fig.suptitle(suptitle)
 
     fig.tight_layout()
     fig.savefig(file_name)
