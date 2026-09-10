@@ -35,22 +35,19 @@ def step_zero(knots, m, n, fixed_left_tail=False, fixed_right_tail=False):
         local_basis = np.linspace(start, end, l + 2)[1:-1]
         basis.append(local_basis)
 
-    # print([len(x) for x in basis])
-    # print(basis)
     return basis
 
 
 # step 1 : Construct full matrix (𝝲+2 rows) and solve for polynomial spline S and delta
 def step_one(knots, basis, m, n, f, fixed_left_value=None, fixed_right_value=None):
-    P_matrices = [nadia.build_P_matrix(i, basis, knots, m) for i in range(n)]
-    Q_rows = [nadia.build_Q_row(i, knots, m) for i in range(n)]
+    temp_basis = basis.copy()
+    if fixed_left_value is not None:
+        temp_basis.append(np.array([knots[0]]))
+    if fixed_right_value is not None:
+        temp_basis.append(np.array([knots[-1]]))
 
-    num_constraints = (1 if fixed_left_value is not None else 0) + (
-        1 if fixed_right_value is not None else 0
-    )
-
-    basis_counts = [len(b) for b in basis]
-    total_rows = sum(basis_counts) + num_constraints
+    basis_counts = [len(b) for b in temp_basis]
+    total_rows = sum(basis_counts)
 
     A = np.zeros((total_rows, total_rows))
     b = np.zeros(total_rows)
@@ -58,45 +55,32 @@ def step_one(knots, basis, m, n, f, fixed_left_value=None, fixed_right_value=Non
     row = 0
     sign = -1
 
-    for interval in range(n):
-        for r in range(basis_counts[interval]):
-            # First element in each row is 1
-            A[row, 0] = 1.0
+    A = np.concatenate(
+        [
+            np.ones((total_rows, 1)),
+            nadia.build_P_matrix(temp_basis, knots, m),
+            np.zeros((total_rows, 1)),
+        ],
+        axis=1,
+    )
 
-            # Fill Q rows Q_1 to Q_{i-1} for the current interval
-            for col_start in range(interval):
-                len_block = 1 + col_start * m
-                A[row, len_block : len_block + m] = Q_rows[col_start]
+    for r in range(A.shape[0]):
+        A[r, -1] = sign
+        sign *= -1
 
-            # Fill this intervals P_i matrix
-            len_block = 1 + interval * m
-            A[row, len_block : len_block + m] = P_matrices[interval][r]
-
-            # Fill delta column with alternating sign
-            A[row, -1] = sign
-
-            # Fill b with function values at basis points
-            b[row] = f(basis[interval][r])
-
-            sign *= -1
-            row += 1
-
-    # A[row] = [1, 0, 0, ..., 0] for fixed left value
-    if fixed_left_value is not None:
-        A[row, 0] = 1.0
-        b[row] = fixed_left_value
-        row += 1
-
-    # A[row] = [1, Q_1, Q_2, ..., Q_n] for fixed right value
+    # Fixed right value
+    row = A.shape[0] - 1
     if fixed_right_value is not None:
-        A[row, 0] = 1.0
-
-        for interval in range(n):
-            len_block = 1 + interval * m
-            A[row, len_block : len_block + m] = Q_rows[interval]
-
+        A[row, -1] = 0
         b[row] = fixed_right_value
-        row += 1
+        row -= 1
+
+    # Fixed left value
+    if fixed_left_value is not None:
+        A[row, -1] = 0
+        b[row] = fixed_left_value
+
+    print(A)
 
     solution = np.linalg.solve(A, b)
     a0 = solution[0]
@@ -105,9 +89,11 @@ def step_one(knots, basis, m, n, f, fixed_left_value=None, fixed_right_value=Non
     delta = solution[-1]
 
     def S(i, t):
-        # don't have a better name for 'last_term' yet
-        last_term = a0 if i == 0 else S(i - 1, knots[i])
-        return sum(a[i, j] * (t - knots[i]) ** (j + 1) for j in range(m)) + last_term
+        return sum(
+            a[i, j] * np.maximum(0, t - knot) ** (j + 1)
+            for j in range(m)
+            for i, knot in enumerate(knots[0:-1])
+        )
 
     return S, delta, a0, a
 
@@ -446,7 +432,7 @@ def gra(f, knots, m, n, fixed_left_value=None, fixed_right_value=None):
 
 
 if __name__ == "__main__":
-    function_name = "cos_if_else"
+    function_name = "sin_weird"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
     a, b = 0, 12
@@ -455,7 +441,7 @@ if __name__ == "__main__":
     n = k + 1
 
     # Choose intial knots
-    internal_knot = 10.26
+    internal_knot = 2 * np.pi
     knots = [a, internal_knot, b]
 
     print(f"Function: {function_name}")
@@ -484,6 +470,7 @@ if __name__ == "__main__":
         result["basis"],
         m,
         k,
+        result["d_max"],
         status,
         f"spline_{function_name}_a{a}_b{b}_knot_{internal_knot}.png",
     )

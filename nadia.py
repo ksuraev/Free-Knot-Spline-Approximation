@@ -29,10 +29,17 @@ def step_zero(knots, m, n):
 
 # Construct P_i matrix for given subinterval i
 # p^i_𝛼β = {(t_i𝛼-θ_{i-1})^β}, 𝛼=1,...,k_i, β=1,...,m
-def build_P_matrix(i, basis, knots, m):
-    prev_knot = knots[i]
+def build_P_matrix(basis, knots, m):
     return np.array(
-        [[(t - prev_knot) ** beta for beta in range(1, m + 1)] for t in basis[i]]
+        [
+            [
+                np.maximum(0, t - knot) ** beta
+                for beta in range(1, m + 1)
+                for knot in knots[0:-1]
+            ]
+            for b in basis
+            for t in b
+        ]
     )
 
 

@@ -29,6 +29,10 @@ def f_cos_weird(t):
     return np.where(t <= 3 * np.pi, np.cos(t) + 0.1 * (t - 3 * np.pi), np.cos(3 * t))
 
 
+def f_sin_weird(t):
+    return np.where(t <= 2 * np.pi, np.sin(t) + 0.1 * (t - 2 * np.pi), np.sin(t))
+
+
 TEST_FUNCTIONS = {
     "sin": (f_sin, r"$\sin(t)$"),
     "sin3t": (f_sin_3t, r"$\sin(3t)$"),
@@ -39,5 +43,9 @@ TEST_FUNCTIONS = {
     "cos_weird": (
         f_cos_weird,
         r"$\cos(t) + 0.1(t - 3\pi)$ if $t \leq 3\pi$, else $\cos(3t)$",
+    ),
+    "sin_weird": (
+        f_sin_weird,
+        r"$\sin(t) + 0.1(t - 2\pi)$ if $t \leq 2\pi$, else $\sin(t)$",
     ),
 }
