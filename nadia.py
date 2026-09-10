@@ -9,7 +9,7 @@ TOL = 1e-5
 ALTERNANCE_TOL = 1e-5
 
 
-# Form intial basis - m per internal subinterval, m+1 per endpoint subinterval. Internal spline knots are excluded from the basis
+# Form initial basis - m per internal subinterval, m+1 per endpoint subinterval. Internal spline knots are excluded from the basis
 def step_zero(knots, m, n):
     basis = []
 
@@ -22,8 +22,6 @@ def step_zero(knots, m, n):
         local_basis = np.linspace(start, end, m + 3)[s:e]
         basis.append(local_basis)
 
-    # print([len(x) for x in basis])
-    # print(basis)
     return basis
 
 
@@ -41,6 +39,31 @@ def build_P_matrix(basis, knots, m):
             for t in b
         ]
     )
+
+
+def build_gradients(basis, knots, m, a, signs):
+    P = build_P_matrix(basis, knots, m)
+    P = np.transpose(P)
+
+    M = np.zeros((len(knots) - 2, P.shape[1]))
+    # print(P)
+    # print(M)
+    for i, knot in enumerate(knots[1:-1]):
+        col = 0
+        for b in basis:
+            for t in b:
+                if t > knot:
+                    M[i, col] = sum(
+                        -(j + 1) * a[i, j] * (t - knot) ** j for j in range(m)
+                    )
+
+                col += 1
+
+    G = np.concatenate([np.ones((1, P.shape[1])), P, M], axis=0)
+    G = np.multiply(G, signs)
+    # G = np.concatenate([np.ones((G.shape[0], 1)), G], axis=1)
+
+    return G
 
 
 # Construct Q_i matrix row for given subinterval i

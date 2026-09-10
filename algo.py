@@ -291,7 +291,7 @@ def plot_psi(
 
 
 if __name__ == "__main__":
-    function_name = "sin"
+    function_name = "sin_weird"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
     a = 0
@@ -322,19 +322,19 @@ if __name__ == "__main__":
     start_theta = a + 0.1
     end_theta = b - 0.1
 
-    # psi plot with swap
-    plot_psi(
-        f,
-        f_label,
-        a,
-        b,
-        m,
-        n,
-        start_theta,
-        end_theta,
-        plot_dir
-        / f"PSI_{function_name}_a{a}_b{b}_s{start_theta}_e{end_theta}_k{k}_m{m}_with_swap.png",
-    )
+    # # psi plot with swap
+    # plot_psi(
+    #     f,
+    #     f_label,
+    #     a,
+    #     b,
+    #     m,
+    #     n,
+    #     start_theta,
+    #     end_theta,
+    #     plot_dir
+    #     / f"PSI_{function_name}_a{a}_b{b}_s{start_theta}_e{end_theta}_k{k}_m{m}_with_swap.png",
+    # )
 
     # # psi plot without swap
     # plot_psi(
@@ -352,35 +352,35 @@ if __name__ == "__main__":
     # )
 
     # psi with swap
-    # theta_opt, psi_result = opt(f, a, b, m, n, 6.3, x_max)
+    theta_opt, psi_result = opt(f, a, b, m, n, 7.8, x_max)
 
-    # print(
-    #     f"optimal theta: {theta_opt:.10f}, psi(theta_opt): {psi_result['d_max']:.10f}"
-    # )
+    print(
+        f"optimal theta: {theta_opt:.10f}, psi(theta_opt): {psi_result['d_max']:.10f}"
+    )
 
-    # case = (
-    #     "fixed left"
-    #     if psi_result["case"] == 2
-    #     else "fixed right" if psi_result["case"] == 3 else "two intervals"
-    # )
-    # status = f"optimal, {case}" if psi_result["optimal"] else f"not optimal, {case}"
-    # nadia.plot(
-    #     f,
-    #     f_label,
-    #     a,
-    #     b,
-    #     n,
-    #     psi_result["S"],
-    #     psi_result["knots"],
-    #     psi_result["basis"],
-    #     m,
-    #     k,
-    #     psi_result["d_max"],
-    #     status,
-    #     plot_dir
-    #     / f"{function_name}_a{a}_b{b}_knot{theta_opt:.5f}_k{k}_m{m}_psi(t){psi_result["d_max"]:.5f}_with_swap.png",
-    #     f"Degree-{m} spline approximation of {f_label}. {k} internal knots ({status}). Max abs deviation: {psi_result["d_max"]:.5f} (with swap)",
-    # )
+    case = (
+        "fixed left"
+        if psi_result["case"] == 2
+        else "fixed right" if psi_result["case"] == 3 else "two intervals"
+    )
+    status = f"optimal, {case}" if psi_result["optimal"] else f"not optimal, {case}"
+    nadia.plot(
+        f,
+        f_label,
+        a,
+        b,
+        n,
+        psi_result["S"],
+        psi_result["knots"],
+        psi_result["basis"],
+        m,
+        k,
+        psi_result["d_max"],
+        status,
+        plot_dir
+        / f"{function_name}_a{a}_b{b}_knot{theta_opt:.5f}_k{k}_m{m}_psi(t){psi_result["d_max"]:.5f}_with_swap.png",
+        f"Degree-{m} spline approximation of {f_label}. {k} internal knots ({status}). Max abs deviation: {psi_result["d_max"]:.5f} (with swap)",
+    )
 
     # # # psi without swap
     # # theta_opt, psi_result = opt(f, a, b, m, n, 4.74, x_max, psi=psi_without_swap)

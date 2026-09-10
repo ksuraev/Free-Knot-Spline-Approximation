@@ -68,6 +68,8 @@ def step_one(knots, basis, m, n, f, fixed_left_value=None, fixed_right_value=Non
         A[r, -1] = sign
         sign *= -1
 
+    b = np.array([f(t) for b in temp_basis for t in b])
+
     # Fixed right value
     row = A.shape[0] - 1
     if fixed_right_value is not None:
@@ -80,7 +82,7 @@ def step_one(knots, basis, m, n, f, fixed_left_value=None, fixed_right_value=Non
         A[row, -1] = 0
         b[row] = fixed_left_value
 
-    print(A)
+    # print(A)
 
     solution = np.linalg.solve(A, b)
     a0 = solution[0]
@@ -88,8 +90,12 @@ def step_one(knots, basis, m, n, f, fixed_left_value=None, fixed_right_value=Non
 
     delta = solution[-1]
 
+    # print(a)
+    # print(b)
+
+    # spline
     def S(i, t):
-        return sum(
+        return a0 + sum(
             a[i, j] * np.maximum(0, t - knot) ** (j + 1)
             for j in range(m)
             for i, knot in enumerate(knots[0:-1])
@@ -323,9 +329,7 @@ def gra(f, knots, m, n, fixed_left_value=None, fixed_right_value=None):
     optimal = False
     exit_type = None
 
-    exit_i_star = None
-    exit_t_star = None
-    exit_d_star = None
+    exit_i_star, exit_t_star, exit_d_star = None, None, None
 
     for _ in range(100):
         (max_i, t_max, d_max), (min_i, t_min, d_min), (i_star, t_star, d_star) = (
@@ -345,9 +349,7 @@ def gra(f, knots, m, n, fixed_left_value=None, fixed_right_value=None):
 
         if new_basis is None:
             exit_type = 2
-            exit_i_star = i_star
-            exit_t_star = t_star
-            exit_d_star = d_star
+            exit_i_star, exit_t_star, exit_d_star = i_star, t_star, d_star
             break
 
         basis = new_basis
@@ -375,60 +377,61 @@ def gra(f, knots, m, n, fixed_left_value=None, fixed_right_value=None):
         "exit_t_star": exit_t_star,
         "exit_i_star": exit_i_star,
         "exit_d_star": exit_d_star,
+        "signs": signs,
     }
 
 
-# def kate(f, function_name, a, b, m, k, n):
-#     knots, x_min, x_max, d = nurnberger.discontinuous_spline(
-#         f, function_name, a, b, k, m
-#     )
+def kate(f, function_name, a, b, m, k, n):
+    knots, x_min, x_max, d = nurnberger.discontinuous_spline(
+        f, function_name, a, b, k, m
+    )
 
-#     result = gra(f, knots, m, n)
+    result = gra(f, knots, m, n)
 
-#     print(f"d_min: {d}, d_max: {result['d_max']}")
+    print(f"d_min: {d}, d_max: {result['d_max']}")
 
-#     t_min = x_min
-#     t_max = x_max
+    t_min = x_min
+    t_max = x_max
 
-#     P1, _, _ = remez.remez(f, a, t_min, m)
+    P1, _, _ = remez.remez(f, a, t_min, m)
 
-#     d_min = d
-#     d_max = result["d_max"]
+    d_min = d
+    d_max = result["d_max"]
 
-#     result = gra(f, [t_min, b], m, 1, fixed_left_value=P1(t_min))
-#     d_new_min = result["d_max"]
-#     result = gra(f, [t_max, b], m, 1, fixed_left_value=P1(t_max))
-#     d_new_max = result["d_max"]
+    result = gra(f, [t_min, b], m, 1, fixed_left_value=P1(t_min))
+    d_new_min = result["d_max"]
+    result = gra(f, [t_max, b], m, 1, fixed_left_value=P1(t_max))
+    d_new_max = result["d_max"]
 
-#     if abs(d_new_min - d_min) < 1e-5:
-#         return t_min
-#     if abs(d_new_max - d_min) < 1e-5:
-#         return t_max
+    if abs(d_new_min - d_min) < 1e-5:
+        return t_min
+    if abs(d_new_max - d_min) < 1e-5:
+        return t_max
 
-#     if d_new_min > d_min and d_new_max < d_min:
+    if d_new_min > d_min and d_new_max < d_min:
 
-#         for _ in range(100):
+        for _ in range(100):
 
-#             if t_max - t_min < 1e-5:
-#                 break
+            if t_max - t_min < 1e-5:
+                break
 
-#             # d_k = (d_min * d_max) ** 0.5
-#             t_k = (t_min + t_max) / 2
+            # d_k = (d_min * d_max) ** 0.5
+            t_k = (t_min + t_max) / 2
 
-#             result = gra(f, [t_k, b], m, 1, fixed_left_value=P1(t_k))
-#             d_new = result["d_max"]
+            result = gra(f, [t_k, b], m, 1, fixed_left_value=P1(t_k))
+            d_new = result["d_max"]
 
-#             if abs(d_new - d_min) < 1e-5:
-#                 return t_k
-#             if d_new > d_min:
-#                 t_min = t_k
-#             elif d_new < d_min:
-#                 t_max = t_k
+            if abs(d_new - d_min) < 1e-5:
+                return t_k
+            if d_new > d_min:
+                t_min = t_k
+            elif d_new < d_min:
+                t_max = t_k
 
-# knot must be between a and x_min or maybe knot
-# if t_k < x_min:
-#     knots = [a, t_k, b]
-#     result = gra(f, knots, m, n)
+    # knot must be between a and x_min or maybe knot
+    if t_k < x_min:
+        knots = [a, t_k, b]
+        result = gra(f, knots, m, n)
 
 
 if __name__ == "__main__":
@@ -440,7 +443,7 @@ if __name__ == "__main__":
     m = 1
     n = k + 1
 
-    # Choose intial knots
+    # Choose initial knots
     internal_knot = 2 * np.pi
     knots = [a, internal_knot, b]
 
@@ -451,29 +454,33 @@ if __name__ == "__main__":
 
     if result["exit_type"] == 1:
         print("EXIT 1 (spline is optimal). Minimal chain: ", result["chain"])
-    elif result["exit_type"] == 2:
-        print("EXIT 2 (no valid exchange).")
 
     print("basis:            ", result["basis"])
     print("alternance points:", result["alternance_points"])
     print(f"Max abs deviation: {result["d_max"]:.5f} at t = {result["t_star"]:.5f}")
 
-    status = "Optimal" if result["optimal"] else "Not optimal"
-    nadia.plot(
-        f,
-        f_label,
-        a,
-        b,
-        n,
-        result["S"],
-        knots,
-        result["basis"],
-        m,
-        k,
-        result["d_max"],
-        status,
-        f"spline_{function_name}_a{a}_b{b}_knot_{internal_knot}.png",
+    G = nadia.build_gradients(
+        result["basis"], result["knots"], m, result["coefficients"], result["signs"]
     )
+
+    print("Gradient matrix G:\n", G)
+
+    # status = "Optimal" if result["optimal"] else "Not optimal"
+    # nadia.plot(
+    #     f,
+    #     f_label,
+    #     a,
+    #     b,
+    #     n,
+    #     result["S"],
+    #     knots,
+    #     result["basis"],
+    #     m,
+    #     k,
+    #     result["d_max"],
+    #     status,
+    #     f"spline_{function_name}_a{a}_b{b}_knot_{internal_knot}.png",
+    # )
 
 
 # # 2nd numerical experiment from Poussin paper
