@@ -18,19 +18,21 @@ def step_zero(knots, m, n, fixed_left_tail=False, fixed_right_tail=False):
         start = knots[i]
         end = knots[i + 1]
 
+        l = m + 1 if (i == 0 or i == n - 1) else m
+
         # default
-        s = 0 if i == 0 else 1
-        e = -1 if i == n - 1 else -2
+        # s = 0 if i == 0 else 1
+        # e = -1 if i == n - 1 else -2
 
-        # fixed left tail - exclude the left endpoint from basis
-        if i == 0 and fixed_left_tail:
-            s = 1
+        # # fixed left tail - exclude the left endpoint from basis
+        # if i == 0 and fixed_left_tail:
+        #     s = 1
 
-        # fixed right tail - exclude the right endpoint from basis
-        if i == n - 1 and fixed_right_tail:
-            e = -2
+        # # fixed right tail - exclude the right endpoint from basis
+        # if i == n - 1 and fixed_right_tail:
+        #     e = -2
 
-        local_basis = np.linspace(start, end, m + 3)[s:e]
+        local_basis = np.linspace(start, end, l + 2)[1:-1]
         basis.append(local_basis)
 
     # print([len(x) for x in basis])

@@ -352,7 +352,7 @@ if __name__ == "__main__":
     # )
 
     # psi with swap
-    # theta_opt, psi_result = opt(f, a, b, m, n, 2.6, x_max)
+    # theta_opt, psi_result = opt(f, a, b, m, n, 6.3, x_max)
 
     # print(
     #     f"optimal theta: {theta_opt:.10f}, psi(theta_opt): {psi_result['d_max']:.10f}"
