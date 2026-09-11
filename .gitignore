@@ -9,4 +9,4 @@ ignore/
 old_csv/
 old_plots/
 plots
-plot.py
+report_plot.py
