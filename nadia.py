@@ -25,8 +25,6 @@ def step_zero(knots, m, n):
     return basis
 
 
-# Construct P_i matrix for given subinterval i
-# p^i_𝛼β = {(t_i𝛼-θ_{i-1})^β}, 𝛼=1,...,k_i, β=1,...,m
 def build_P_matrix(basis, knots, m):
     return np.array(
         [
@@ -46,8 +44,7 @@ def build_gradients(basis, knots, m, a, signs):
     P = np.transpose(P)
 
     M = np.zeros((len(knots) - 2, P.shape[1]))
-    # print(P)
-    # print(M)
+
     for i, knot in enumerate(knots[1:-1]):
         col = 0
         for b in basis:
@@ -61,9 +58,17 @@ def build_gradients(basis, knots, m, a, signs):
 
     G = np.concatenate([np.ones((1, P.shape[1])), P, M], axis=0)
     G = np.multiply(G, signs)
-    # G = np.concatenate([np.ones((G.shape[0], 1)), G], axis=1)
 
     return G
+
+
+# Construct P_i matrix for given subinterval i
+# p^i_𝛼β = {(t_i𝛼-θ_{i-1})^β}, 𝛼=1,...,k_i, β=1,...,m
+def build_P_matrix_old(i, basis, knots, m):
+    prev_knot = knots[i]
+    return np.array(
+        [[(t - prev_knot) ** beta for beta in range(1, m + 1)] for t in basis[i]]
+    )
 
 
 # Construct Q_i matrix row for given subinterval i
@@ -74,7 +79,7 @@ def build_Q_row(i, knots, m):
 
 # step 1 : Construct full matrix (𝝲+2 rows) and solve for polynomial spline S and delta
 def step_one(knots, basis, m, n, f):
-    P_matrices = [build_P_matrix(i, basis, knots, m) for i in range(n)]
+    P_matrices = [build_P_matrix_old(i, basis, knots, m) for i in range(n)]
     Q_rows = [build_Q_row(i, knots, m) for i in range(n - 1)]
 
     basis_counts = [len(b) for b in basis]
@@ -380,7 +385,7 @@ def plot(
         ax1.plot(
             t_interval,
             S(i, t_interval),
-            color="dodgerblue",
+            color="cornflowerblue",
             label="Spline approximation" if i == 0 else None,
         )
 
@@ -503,16 +508,16 @@ def gra(f, knots, m, n):
 
 
 if __name__ == "__main__":
-    function_name = "sin"
+    function_name = "g"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
-    a, b = 2, 6
-    k = 1  # number of internal fixed knots
-    m = 2  # degree of polynomial to fit in each subinterval
+    a, b = -1, 1
+    k = 9  # number of internal fixed knots
+    m = 1  # degree of polynomial to fit in each subinterval
     n = k + 1  # number of subintervals
 
     # Choose intial knots
-    knots = [2, 3.43177734, 6]  # differentiable at 3.43177734
+    knots = np.linspace(a, b, k + 2)
 
     result = gra(f, knots, m, n)
 
@@ -537,6 +542,7 @@ if __name__ == "__main__":
         result["basis"],
         m,
         k,
+        result["d_max"],
         status,
         f"orig_{function_name}_k{k}_m{m}.png",
     )

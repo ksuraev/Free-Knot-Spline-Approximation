@@ -91,8 +91,7 @@ def remez(f, a, b, n, tol=1e-6, max_iter=10000):
         if abs(E) < 1e-14:
             converged = abs(d_max) < 1e-14
         else:
-            C = abs(d_max) / abs(E)
-            converged = C <= 1 + tol
+            converged = abs(d_max) - abs(E) <= tol * abs(E)
         if converged:
             return P, d_max, xn
 
@@ -103,34 +102,58 @@ def remez(f, a, b, n, tol=1e-6, max_iter=10000):
     return P, d_max, xn
 
 
-def plot(f, P, xn, a, b, n, plot_name):
-    fig, ax = plt.subplots(figsize=(10, 6))
+def plot(f, f_label, P, xn, a, b, n, plot_name):
+    fig, ax = plt.subplots(figsize=(7, 5))
 
     # original function f(x)
     x = np.linspace(a, b, 1000)
-    ax.plot(x, f(x), color="slategray", label="f(x)")
+    ax.plot(x, f(x), color="darkslategray", label=f_label)
 
     # approximation polynomial P(x)
-    ax.plot(x, P(x), color="dodgerblue", label="P(x)")
+    ax.plot(
+        x,
+        P(x),
+        linewidth=2,
+        color="cornflowerblue",
+        label=rf"$P_{{{n}}}(t)$",
+    )
 
     # alternance points
-    for x in xn:
-        ax.axvline(x=x, color="lightgray", linestyle="--", alpha=0.5)
+    for x_i in xn:
+        y_f = f(x_i)
+        y_p = P(x_i)
 
-    ax.set_title(f"Remez approximation of degree {n}")
-    ax.legend(loc="best")
+        # point on P
+        ax.scatter(x_i, y_p, color="black", s=30, zorder=5)
+
+        # deviation between f and P
+        ax.plot(
+            [x_i, x_i],
+            [y_p, y_f],
+            color="black",
+            linestyle=(0, (8, 5)),
+            linewidth=0.8,
+            alpha=0.7,
+        )
+    # ax.set_title(f"Remez degree {n} approximation.")
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    for spine in ax.spines.values():
+        spine.set_linewidth(0.6)
+    ax.tick_params(axis="both", which="major", labelsize=14)
+    ax.legend(fontsize=15, frameon=False, loc="best")
     fig.tight_layout()
-    fig.savefig(plot_name)
-    plt.show()
+    fig.savefig(plot_name, dpi=300, bbox_inches="tight")
+    # plt.show()
 
 
 if __name__ == "__main__":
-    function_name = "cos_weird"
+    function_name = "g"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
-    a, b = 0, 2 * np.pi
-    n = 1
-    P, d_max, xn = remez(f, a, b, n)
+    a, b = -1, 1
+    m = 50
+    P, d_max, xn = remez(f, a, b, m)
     print(f"Max error: {d_max}")
     print(f"Alternance points: {xn}")
-    plot(f, P, xn, a, b, n, "remez.png")
+    plot(f, f_label, P, xn, a, b, m, f"remez_{function_name}_m{m}_a{a}_b{b}.png")
