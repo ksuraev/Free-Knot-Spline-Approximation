@@ -81,7 +81,7 @@ def find_alternance_points(f, P, a, b):
 
 
 def subroutine(f, function_name, x_i, b, degree, d_n, max_iter):
-    results = []
+    # results = []
 
     d_i, _ = d(f, x_i, b, degree)
 
@@ -103,18 +103,18 @@ def subroutine(f, function_name, x_i, b, degree, d_n, max_iter):
         else:
             x_u = x_bar
 
-        results.append(
-            {
-                "d_n": d_n,
-                "d_i_max": d_i_max,
-                "x_l": x_l,
-                "x_bar": x_bar,
-                "x_u": x_u,
-                # "x_l_dev": deviation(f, remez.remez(f, x_i, x_l, degree)[0], x_l),
-                # "x_bar_dev": deviation(f, remez.remez(f, x_i, x_bar, degree)[0], x_bar),
-                # "x_u_dev": deviation(f, remez.remez(f, x_i, x_u, degree)[0], x_u),
-            }
-        )
+        # results.append(
+        #     {
+        #         "d_n": d_n,
+        #         "d_i_max": d_i_max,
+        #         "x_l": x_l,
+        #         "x_bar": x_bar,
+        #         "x_u": x_u,
+        #         "x_l_dev": deviation(f, remez.remez(f, x_i, x_l, degree)[0], x_l),
+        #         "x_bar_dev": deviation(f, remez.remez(f, x_i, x_bar, degree)[0], x_bar),
+        #         "x_u_dev": deviation(f, remez.remez(f, x_i, x_u, degree)[0], x_u),
+        #     }
+        # )
 
     x_max = x_l
 
@@ -277,12 +277,12 @@ def plot(f, f_label, polynomial, a, b, knots, alt_pts, m, k, file_name):
 
 if __name__ == "__main__":
 
-    function_name = "cos_weird"
+    function_name = "g"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
-    file_name = f"n_{function_name}_results.csv"
-    with open(file_name, "w", newline=""):
-        pass
+    # file_name = f"n_{function_name}_results.csv"
+    # with open(file_name, "w", newline=""):
+    #     pass
 
     a, b = 0, 12
     k = 1  # number of free knots (not including a and b)
@@ -300,6 +300,10 @@ if __name__ == "__main__":
 
     print("all alt pts:", all_alt_pts)
 
+    i_star, t_star, d_star = find_max_deviation_overall(f, polynomial)
+
+    print(f"Max deviation: i_star={i_star}, t_star={t_star}, d_star={d_star}")
+
     plot(
         f,
         f_label,
@@ -310,29 +314,5 @@ if __name__ == "__main__":
         all_alt_pts,
         m,
         k,
-        f"n_{function_name}_a{a}_b{b}_knot{knots[1]:.5f}_k{k}_m{m}.png",
+        f"n_{function_name}_a{a}_b{b}_k{k}_m{m}.png",
     )
-    i_star, t_star, d_star = find_max_deviation_overall(f, polynomial)
-
-    print(f"Max deviation: i_star={i_star}, t_star={t_star}, d_star={d_star}")
-
-    # print(f"deviation at 0: {deviation(f, polynomial[0][2], 0)}")
-
-    # pts = [
-    #     3.14191269,
-    #     6.28262527,
-    #     7.33032954,
-    #     8.37803381,
-    #     9.42453796,
-    #     10.47224223,
-    #     11.51874638,
-    # ]
-    # for pt in pts:
-    #     for start, end, P in polynomial:
-    #         if start <= pt <= end:
-    #             print(f"Deviation at {pt}: {deviation(f, P, pt)}")
-    #             break
-
-    # knots, d_min, d_max = run(f, a, b, k, m, True)
-    # print(f"Last alt pt knots: {knots}. Max and min d: {d_max:.8f}, {d_min:.8f}")
-    # plot(knots, m, a, b, "last_alt_knots.png")

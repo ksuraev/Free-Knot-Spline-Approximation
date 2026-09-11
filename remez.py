@@ -102,7 +102,7 @@ def remez(f, a, b, n, tol=1e-6, max_iter=10000):
     return P, d_max, xn
 
 
-def plot(f, f_label, P, xn, a, b, n, plot_name):
+def plot(f, f_label, P, xn, a, b, n, plot_name, knots=None):
     fig, ax = plt.subplots(figsize=(7, 5))
 
     # original function f(x)
@@ -117,7 +117,15 @@ def plot(f, f_label, P, xn, a, b, n, plot_name):
         color="cornflowerblue",
         label=rf"$P_{{{n}}}(t)$",
     )
-
+    if knots is not None:
+        for j, knot in enumerate(knots):
+            ax.axvline(
+                knot,
+                color="red",
+                lw=0.5,
+                alpha=0.6,
+                label="Knots" if j == 0 else None,
+            )
     # alternance points
     for x_i in xn:
         y_f = f(x_i)
