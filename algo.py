@@ -4,9 +4,9 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-import nadia
-import nadia_mod
+import nadia_exchange_mod
 import nurnberger_mod
+import plotting
 import remez
 import test_functions
 
@@ -17,15 +17,27 @@ plot_dir.mkdir(parents=True, exist_ok=True)
 
 
 def fixed_left_tail(f, a, theta, b, m, n):
+    # Run Remez on the left interval [a, theta] to get the polynomial
     P_left, d_left, alt_left = remez.remez(f, a, theta, m)
-    fixed_left = nadia_mod.gra(f, [theta, b], m, 1, fixed_left_value=P_left(theta))
 
+    # Run GRA on the right interval [theta, b] with fixed left value P_left(theta)
+    fixed_left = nadia_exchange_mod.gra(
+        f, [theta, b], m, 1, fixed_left_value=P_left(theta)
+    )
+
+    # Spline function combining the left polynomial and the right spline
     def S(i, t):
         if i == 0:
             return P_left(t)
         return fixed_left["S"](0, t)
 
+    a0 = P_left(a)
+    a1 = P_left.coef[1:]
+    a2 = np.array([fixed_left["coefficients"][0] - a1[0]])
+
     return {
+        "a0": a0,
+        "coeffs": [a1, a2],
         "d_max": abs(d_left),
         "gra_d_max": fixed_left["d_max"],
         "case": 2,
@@ -33,19 +45,29 @@ def fixed_left_tail(f, a, theta, b, m, n):
         "basis": [np.asarray(alt_left), fixed_left["basis"][0]],
         "knots": [a, theta, b],
         "optimal": fixed_left["exit_type"] == 1,
+        "signs": fixed_left["signs"],
+        "alternance_points": fixed_left["alternance_points"],
     }
 
 
 def fixed_right_tail(f, a, theta, b, m, n):
+    # Run Remez on the right interval [theta, b] to get the polynomial
     P_right, d_right, alt_right = remez.remez(f, theta, b, m)
-    fixed_right = nadia_mod.gra(f, [a, theta], m, 1, fixed_right_value=P_right(theta))
 
+    # Run GRA on the left interval [a, theta] with fixed right value P_right(theta)
+    fixed_right = nadia_exchange_mod.gra(
+        f, [a, theta], m, 1, fixed_right_value=P_right(theta)
+    )
+
+    # Spline function combining the left spline and the right polynomial
     def S(i, t):
         if i == 0:
             return fixed_right["S"](0, t)
         return P_right(t)
 
     return {
+        "a0": fixed_right["a0"],
+        "coeffs": fixed_right["coefficients"],
         "d_max": abs(d_right),
         "gra_d_max": fixed_right["d_max"],
         "case": 3,
@@ -53,15 +75,19 @@ def fixed_right_tail(f, a, theta, b, m, n):
         "basis": [np.asarray(fixed_right["basis"][0]), alt_right],
         "knots": [a, theta, b],
         "optimal": fixed_right["exit_type"] == 1,
+        "signs": fixed_right["signs"],
     }
 
 
 def psi_with_swap(f, a, b, theta, m, n):
-    two_int_chain = nadia_mod.gra(f, [a, theta, b], m, n)
+    two_int_chain = nadia_exchange_mod.gra(f, [a, theta, b], m, n)
 
     # Case 1: found optimal spline across two intervals
     if two_int_chain["exit_type"] == 1:
         return {
+            "alternance_points": two_int_chain["alternance_points"],
+            "signs": two_int_chain["signs"],
+            "coeffs": two_int_chain["coefficients"],
             "d_max": two_int_chain["d_max"],
             "case": 1,
             "S": two_int_chain["S"],
@@ -83,18 +109,17 @@ def psi_with_swap(f, a, b, theta, m, n):
                 f"case 2: d_max={fixed_left['d_max']:.10f} < gra_d_max={fixed_left['gra_d_max']:.10f} at theta={theta:.10f}"
             )
             fixed_right = fixed_right_tail(f, a, theta, b, m, n)
+
+            # Compare the differences between gra_d_max and d_max for both fixed_left and fixed_right
             fixed_right_diff = abs(fixed_right["gra_d_max"] - fixed_right["d_max"])
             fixed_left_diff = abs(fixed_left["gra_d_max"] - fixed_left["d_max"])
+
+            # Return whichever fixed tail has the smaller difference between gra_d_max and d_max
             if fixed_right_diff < fixed_left_diff:
                 print(
                     f"case 2a: fixed_right_diff={fixed_right_diff:.10f} < fixed_left_diff={fixed_left_diff:.10f} at theta={theta:.10f}"
                 )
                 return fixed_right
-            # if abs(fixed_right["gra_d_max"]) > abs(fixed_right["d_max"]) + 1e-1:
-            #     print(
-            #         f"case 2a: d_max={fixed_right['d_max']:.10f} < gra_d_max={fixed_right['gra_d_max']:.10f} at theta={theta:.10f}"
-            #     )
-            #     return fixed_right
 
         return fixed_left
 
@@ -108,46 +133,45 @@ def psi_with_swap(f, a, b, theta, m, n):
             f"case 3: d_max={fixed_right['d_max']:.10f} < gra_d_max={fixed_right['gra_d_max']:.10f} at theta={theta:.10f}"
         )
         fixed_left = fixed_left_tail(f, a, theta, b, m, n)
+
+        # Compare the differences between gra_d_max and d_max for both fixed_left and fixed_right
         fixed_left_diff = abs(fixed_left["gra_d_max"] - fixed_left["d_max"])
         fixed_right_diff = abs(fixed_right["gra_d_max"] - fixed_right["d_max"])
+
+        # Return whichever fixed tail has the smaller difference between gra_d_max and d_max
         if fixed_left_diff < fixed_right_diff:
             print(
                 f"case 3a: fixed_left_diff={fixed_left_diff:.10f} < fixed_right_diff={fixed_right_diff:.10f} at theta={theta:.10f}"
             )
             return fixed_left
-        # if abs(fixed_left["gra_d_max"]) > abs(fixed_left["d_max"]) + 1e-1:
-        #     print(
-        #         f"case 3a: d_max={fixed_left['d_max']:.10f} < gra_d_max={fixed_left['gra_d_max']:.10f} at theta={theta:.10f}"
-        #     )
-        #     return fixed_left
 
     return fixed_right
 
 
-def psi_without_swap(f, a, b, theta, m, n):
-    two_int_chain = nadia_mod.gra(f, [a, theta, b], m, n)
+# def psi_without_swap(f, a, b, theta, m, n):
+#     two_int_chain = nadia_exchange_mod.gra(f, [a, theta, b], m, n)
 
-    # Case 1: found optimal spline across two intervals
-    if two_int_chain["exit_type"] == 1:
-        return {
-            "d_max": two_int_chain["d_max"],
-            "case": 1,
-            "S": two_int_chain["S"],
-            "basis": two_int_chain["basis"],
-            "knots": [a, theta, b],
-            "optimal": True,
-        }
+#     # Case 1: found optimal spline across two intervals
+#     if two_int_chain["exit_type"] == 1:
+#         return {
+#             "d_max": two_int_chain["d_max"],
+#             "case": 1,
+#             "S": two_int_chain["S"],
+#             "basis": two_int_chain["basis"],
+#             "knots": [a, theta, b],
+#             "optimal": True,
+#         }
 
-    exit_interval = two_int_chain["exit_i_star"]
+#     exit_interval = two_int_chain["exit_i_star"]
 
-    # Case 2: tried to replace basis point in 1st interval
-    # [a, theta] as minimal chain
-    if exit_interval == 0:
-        return fixed_left_tail(f, a, theta, b, m, n)
+#     # Case 2: tried to replace basis point in 1st interval
+#     # [a, theta] as minimal chain
+#     if exit_interval == 0:
+#         return fixed_left_tail(f, a, theta, b, m, n)
 
-    # Case 3: tried to replace basis point in 2nd interval
-    # [theta, b] as minimal chain
-    return fixed_right_tail(f, a, theta, b, m, n)
+#     # Case 3: tried to replace basis point in 2nd interval
+#     # [theta, b] as minimal chain
+#     return fixed_right_tail(f, a, theta, b, m, n)
 
 
 def directional_derivative(f, a, b, theta, psi_theta, m, n, h, psi=psi_with_swap):
@@ -228,7 +252,7 @@ def opt(
 
         theta = theta_next
     else:
-        print("Maximum iterations reached in opt()")
+        print(f"Maximum iterations ({max_iter}) reached in opt()")
 
     psi_opt = psi(f, a, b, theta, m, n)
 
@@ -313,16 +337,94 @@ if __name__ == "__main__":
     print("x_max:", x_max)
     print("d_n:", d_n)
 
-    # fixed_tail = nadia_mod.gra(f, [a, 5.8], m, 1, fixed_right_value=0)
+    # Find optimal theta
+    theta_opt, psi_result = opt(f, a, b, m, n, 7.8, x_max)
 
-    # print(
-    #     f"basis: {fixed_tail['basis']}, d_max: {fixed_tail['d_max']:.10f}, optimal: {fixed_tail['optimal'], fixed_tail['exit_t_star']}"
+    print(
+        f"optimal theta: {theta_opt:.10f}, psi(theta_opt): {psi_result['d_max']:.10f}"
+    )
+
+    def case(case_num):
+        if case_num == 1:
+            return "two intervals"
+        elif case_num == 2:
+            return "fixed left"
+        elif case_num == 3:
+            return "fixed right"
+
+    status = (
+        f"optimal, {case(psi_result['case'])}"
+        if psi_result["optimal"]
+        else f"not optimal, {case(psi_result['case'])}"
+    )
+
+    plotting.plot_detailed(
+        f,
+        psi_result["S"],
+        a,
+        b,
+        knots=psi_result["knots"],
+        points=psi_result["basis"],
+        f_label=f_label,
+        approximation_label="Spline approximation",
+        points_label="Basis points",
+        title=(
+            f"Degree-{m} spline approximation of {f_label}. "
+            f"{k} internal knots ({status}). "
+            f"Max abs deviation: {psi_result['d_max']:.5f}."
+        ),
+        file_name=plot_dir
+        / f"{function_name}_a{a}_b{b}_knot{theta_opt:.5f}_k{k}_m{m}_psi(t){psi_result['d_max']:.5f}.png",
+    )
+
+    # # gradient test shit
+    # result = psi_with_swap(f, a, b, 7, m, n)
+    # print(f"result: {result}")
+    # # G = nadia.build_gradients(
+    # #     result["alternance_points"], result["knots"], m, a, result["signs"]
+    # # )
+    # d2 = nadia.find_descent_direction(
+    #     result["alternance_points"],
+    #     result["knots"],
+    #     m,
+    #     result["coeffs"],
+    #     result["signs"],
     # )
 
-    start_theta = a + 0.1
-    end_theta = b - 0.1
+    # print(f"descent direction: {d2}")
+
+    # status = (
+    #     f"optimal, {case(result['case'])}"
+    #     if result["optimal"]
+    #     else f"not optimal, {case(result['case'])}"
+    # )
+
+    # nadia.plot(
+    #     f,
+    #     f_label,
+    #     a,
+    #     b,
+    #     n,
+    #     result["S"],
+    #     result["knots"],
+    #     result["basis"],
+    #     m,
+    #     k,
+    #     result["d_max"],
+    #     status,
+    #     plot_dir
+    #     / f"{function_name}_a{a}_b{b}_knot{9:.5f}_k{k}_m{m}_psi(t){result["d_max"]:.5f}_with_swap.png",
+    #     f"Degree-{m} spline approximation of {f_label}. {k} internal knots ({status}). Max abs deviation: {result["d_max"]:.5f} (with swap)",
+    # )
+
+    # r = psi_with_swap(f, a, b, 7, m, n)
+    # d = directional_derivative(f, a, b, 7, r["d_max"], m, n, 0.01)
+    # print(d)
 
     # # psi plot with swap
+    # start_theta = a + 0.1
+    # end_theta = b - 0.1
+
     # plot_psi(
     #     f,
     #     f_label,
@@ -335,81 +437,3 @@ if __name__ == "__main__":
     #     plot_dir
     #     / f"PSI_{function_name}_a{a}_b{b}_s{start_theta}_e{end_theta}_k{k}_m{m}_with_swap.png",
     # )
-
-    # # psi plot without swap
-    # plot_psi(
-    #     f,
-    #     f_label,
-    #     a,
-    #     b,
-    #     m,
-    #     n,
-    #     start_theta,
-    #     end_theta,
-    #     plot_dir
-    #     / f"psi_{function_name}_a{a}_b{b}_s{start_theta}_e{end_theta}_k{k}_m{m}_without_swap.png",
-    #     psi=psi_without_swap,
-    # )
-
-    # psi with swap
-    theta_opt, psi_result = opt(f, a, b, m, n, 7.8, x_max)
-
-    print(
-        f"optimal theta: {theta_opt:.10f}, psi(theta_opt): {psi_result['d_max']:.10f}"
-    )
-
-    case = (
-        "fixed left"
-        if psi_result["case"] == 2
-        else "fixed right" if psi_result["case"] == 3 else "two intervals"
-    )
-    status = f"optimal, {case}" if psi_result["optimal"] else f"not optimal, {case}"
-    nadia.plot(
-        f,
-        f_label,
-        a,
-        b,
-        n,
-        psi_result["S"],
-        psi_result["knots"],
-        psi_result["basis"],
-        m,
-        k,
-        psi_result["d_max"],
-        status,
-        plot_dir
-        / f"{function_name}_a{a}_b{b}_knot{theta_opt:.5f}_k{k}_m{m}_psi(t){psi_result["d_max"]:.5f}_with_swap.png",
-        f"Degree-{m} spline approximation of {f_label}. {k} internal knots ({status}). Max abs deviation: {psi_result["d_max"]:.5f} (with swap)",
-    )
-
-    # # # psi without swap
-    # # theta_opt, psi_result = opt(f, a, b, m, n, 4.74, x_max, psi=psi_without_swap)
-
-    # # print(
-    # #     f"optimal theta: {theta_opt:.10f}, psi(theta_opt): {psi_result['d_max']:.10f}"
-    # # )
-
-    # # case = (
-    # #     "fixed left"
-    # #     if psi_result["case"] == 2
-    # #     else "fixed right" if psi_result["case"] == 3 else "two intervals"
-    # # )
-
-    # # status = f"optimal, {case}" if psi_result["optimal"] else f"not optimal, {case}"
-    # # nadia.plot(
-    # #     f,
-    # #     f_label,
-    # #     a,
-    # #     b,
-    # #     n,
-    # #     psi_result["S"],
-    # #     psi_result["knots"],
-    # #     psi_result["basis"],
-    # #     m,
-    # #     k,
-    # #     psi_result["d_max"],
-    # #     status,
-    # #     plot_dir
-    # #     / f"{function_name}_a{a}_b{b}_knot{theta_opt:.5f}_k{k}_m{m}_psi(t){psi_result["d_max"]:.5f}_without_swap.png",
-    # #     f"Degree-{m} spline approximation of {f_label}. {k} internal knots ({status}). Max abs deviation: {psi_result["d_max"]:.5f} (without swap)",
-    # # )
