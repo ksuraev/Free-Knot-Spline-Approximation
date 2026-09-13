@@ -28,7 +28,7 @@ def _plot_knots(ax, knots, label="Knots"):
         ax.axvline(
             knot,
             color=KNOT_COLOR,
-            lw=0.7,
+            lw=0.8,
             linestyle="-",
             label=label if j == 0 else None,
         )
@@ -70,16 +70,7 @@ def _plot_approximation(
             )
 
 
-def _plot_deviation_curve(
-    ax,
-    f,
-    approximation,
-    knots,
-    a=None,
-    b=None,
-    approximation_type="spline",
-    n_samples=1000,
-):
+def _plot_deviation_curve(ax, f, approximation, knots, a=None, b=None, n_samples=1000):
     if knots is None:
         t = np.linspace(a, b, n_samples)
         d = f(t) - approximation(t)
@@ -103,12 +94,7 @@ def _plot_deviation_curve(
 
 
 def _plot_deviation_markers(
-    ax,
-    f,
-    approximation,
-    points,
-    knots=None,
-    label="Alternance points",
+    ax, f, approximation, points, knots=None, label="Alternance points"
 ):
     points = _flatten_points(points)
 
@@ -121,6 +107,7 @@ def _plot_deviation_markers(
             y_approx = approximation(point)
         else:
             # Piecewise approximation
+            # doesn't quite work for discontinuous spline - assigns to the right so duplicates end up in same interval
             i = np.searchsorted(knots, point, side="right") - 1
             i = min(max(i, 0), len(knots) - 2)
 
@@ -143,7 +130,7 @@ def _plot_deviation_markers(
             [point, point],
             [y_approx, y_f],
             color="black",
-            linestyle=(0, (8, 5)),
+            linestyle="--",
             linewidth=1,
             alpha=0.8,
         )
@@ -229,8 +216,7 @@ def plot_report(
     points=None,
     f_label=r"$f(t)$",
     approximation_label=r"$S(t)$",
-    points_label="Alternance points",
-    show_knots=True,
+    points_label=None,
     title=None,
     file_name=None,
     figsize=(7, 5),
@@ -246,18 +232,13 @@ def plot_report(
     _plot_approximation(ax, approximation, knots, approximation_label, a, b)
 
     # Knots
-    if knots is not None and show_knots:
+    if knots is not None:
         _plot_knots(ax, knots)
 
     # Alternance / basis points and their deviations
     if points is not None:
         _plot_deviation_markers(
-            ax,
-            f,
-            approximation,
-            points,
-            knots=knots,
-            label=points_label,
+            ax, f, approximation, points, knots=knots, label=points_label
         )
 
     ax.set_xlabel(r"$t$")
@@ -269,16 +250,13 @@ def plot_report(
     ax.spines["right"].set_visible(False)
     for spine in ax.spines.values():
         spine.set_linewidth(0.6)
+
     ax.tick_params(axis="both", which="major", labelsize=14)
     ax.legend(fontsize=15, frameon=False, loc="best")
 
     fig.tight_layout()
 
     if file_name is not None:
-        fig.savefig(
-            file_name,
-            dpi=300,
-            bbox_inches="tight",
-        )
+        fig.savefig(file_name, dpi=300, bbox_inches="tight")
 
     plt.show()

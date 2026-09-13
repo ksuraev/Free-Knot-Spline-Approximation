@@ -43,9 +43,10 @@ def subroutine(f, function_name, x_i, b, degree, d_n, max_iter):
     # After the loop, x_l is the largest x_bar such that d_i_max <= d_n
     x_max = x_l
 
-    # _, alt_pts_remez = nurnberger.d(f, x_i, x_max, degree)
+    # Compute the polynomial approximation in the interval [x_i, x_max]
     P, _, _ = remez.remez(f, x_i, x_max, degree)
 
+    # Find the alternance points in the interval [x_i, x_max]
     all_alt_pts, signs, _ = helper.find_alternance_points(
         lambda i, t: deviation(f, P, t), [x_i, x_max], tol=ALTERNANCE_TOL
     )
@@ -103,7 +104,6 @@ def discontinuous_spline(
 
 
 if __name__ == "__main__":
-
     function_name = "g"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
@@ -116,6 +116,7 @@ if __name__ == "__main__":
     polynomials = []
     alt_pts = []
 
+    # todo: nurnberger already calls remez, so should return polynomials from discontinuous_spline (ideally)
     for i in range(len(knots) - 1):
         P, _, alt = remez.remez(f, knots[i], knots[i + 1], m)
         polynomials.append(P)
@@ -125,13 +126,9 @@ if __name__ == "__main__":
     def P(i, t):
         return polynomials[i](t)
 
-    # For extrema calculation
-    def dev(i, t):
-        return f(t) - polynomials[i](t)
-
+    # Find the maximum deviation over all intervals
     _, _, (i_star, t_star, d_star) = helper.find_extrema_overall(
-        dev,
-        knots,
+        lambda i, t: f(t) - P(i, t), knots
     )
 
     print(f"Max deviation: i_star={i_star}, t_star={t_star}, d_star={d_star}")
@@ -147,5 +144,18 @@ if __name__ == "__main__":
         approximation_label="Piecewise polynomial approximation",
         points_label="Alternance points",
         title=f"Degree-{m} approximation with {len(knots) - 2} free knots. Max abs deviation: {d_star:.5f}.",
-        file_name=f"nurnberger_{function_name}_a{a}_b{b}_k{k}_m{m}.png",
+        file_name=f"nberger_{function_name}_a{a}_b{b}_k{k}_m{m}.png",
     )
+
+    # plotting.plot_report(
+    #     f,
+    #     P,
+    #     a,
+    #     b,
+    #     knots=knots,
+    #     points=alt_pts,
+    #     f_label=f_label,
+    #     approximation_label=rf"$S_{{{m}}}(t)$",
+    #     points_label="",
+    #     file_name=f"r_nberger_{function_name}_a{a}_b{b}_k{k}_m{m}.png",
+    # )

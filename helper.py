@@ -34,19 +34,15 @@ def find_local_abs_deviation_maxima(deviation_function, i, start, end, n_samples
 def find_extrema_overall(deviation_function, knots, n_samples=10000):
     n = len(knots) - 1
 
-    t_max = None
-    d_max = -np.inf
-    i_max = None
+    t_max, d_max, i_max = None, -np.inf, None
 
-    t_min = None
-    d_min = np.inf
-    i_min = None
+    t_min, d_min, i_min = None, np.inf, None
 
     for i in range(n):
-        if i == 0:
-            t_samples = np.linspace(knots[i], knots[i + 1], n_samples)
-        else:
-            t_samples = np.linspace(knots[i], knots[i + 1], n_samples)[1:]
+        # if i == 0:
+        t_samples = np.linspace(knots[i], knots[i + 1], n_samples)
+        # else:
+        #     t_samples = np.linspace(knots[i], knots[i + 1], n_samples)[1:]
 
         d_samples = deviation_function(i, t_samples)
 
@@ -109,3 +105,35 @@ def find_alternance_points(
     signs = np.array([np.sign(d) for _, d in unique])
 
     return pts, signs, global_max
+
+
+def find_max_deviation_points(deviation_function, knots, tol=1e-5, n_samples=10000):
+    all_extrema = []
+
+    # Find candidates for maximum absolute deviation in each interval
+    for i in range(len(knots) - 1):
+        extrema = find_local_abs_deviation_maxima(
+            deviation_function, i, knots[i], knots[i + 1], n_samples=n_samples
+        )
+        all_extrema.extend(extrema)
+
+    if not all_extrema:
+        return np.array([]), np.array([]), 0.0
+
+    # Global maximum absolute deviation
+    global_max = max(abs(d) for _, d in all_extrema)
+
+    # Keep all points where the maximum is attained
+    max_points = [(t, d) for t, d in all_extrema if abs(abs(d) - global_max) <= tol]
+
+    # Remove duplicate point
+    unique = []
+
+    for t, d in max_points:
+        if not unique or not np.isclose(t, unique[-1][0]):
+            unique.append((t, d))
+
+    points = np.array([t for t, _ in unique])
+    signs = np.array([np.sign(d) for _, d in unique])
+
+    return points, signs, global_max

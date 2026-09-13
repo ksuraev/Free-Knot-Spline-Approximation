@@ -4,6 +4,8 @@ import helper
 import plotting
 import test_functions
 
+CONVERGENCE_TOL = 1e-14
+
 
 def calculate_polynomial(f, xn, n):
     # Initialise matrix A and vector b
@@ -82,8 +84,8 @@ def remez(f, a, b, n, tol=1e-6, max_iter=10000):
         )
 
         # Check for convergence - Trefethen paper
-        if abs(E) < 1e-14:
-            converged = abs(d_max) < 1e-14
+        if abs(E) < CONVERGENCE_TOL:
+            converged = abs(d_max) < CONVERGENCE_TOL
         else:
             converged = abs(d_max) - abs(E) <= tol * abs(E)
         if converged:
@@ -116,6 +118,5 @@ if __name__ == "__main__":
         points=alt_pts,
         f_label=f_label,
         approximation_label=rf"$P_{{{m}}}(t)$",
-        points_label="Alternance points",
-        file_name=f"r_remez_{function_name}_a{a}_b{b}_m{m}_report.png",
+        file_name=f"remez_report_{function_name}_a{a}_b{b}_m{m}_report.png",
     )

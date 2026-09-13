@@ -89,7 +89,7 @@ if __name__ == "__main__":
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
     a, b = -1, 1
-    k = 5  # number of free knots (not including a and b)
+    k = 1  # number of free knots (not including a and b)
     degree = 1  # degree of polynomial to fit
 
     knots, d_min, d_max = run(f, a, b, k, degree)
@@ -106,6 +106,10 @@ if __name__ == "__main__":
         )
         polynomials.append(P)
         alt_pts.extend(alt)
+
+    print(f"Max deviation: {d_max}")
+    print(f"knots: {knots}")
+    print(f"Alternance points: {alt_pts}")
 
     def S(i, t):
         return polynomials[i](t)

@@ -46,11 +46,9 @@ def exchange(i, t_star, d_star, f, S, basis, knots, n):
         if left_sign == t_star_sign:
             i = left_i
             t_tilde = left_pt
-
         elif right_sign == t_star_sign:
             i = right_i
             t_tilde = right_pt
-
         else:
             print("EXIT 2 (internal knot): No valid basis point to replace")
             return None
@@ -73,7 +71,6 @@ def exchange(i, t_star, d_star, f, S, basis, knots, n):
             and np.sign(nadia_original.deviation(f, S, i, left_pt)) == t_star_sign
         ):
             t_tilde = left_pt
-
         elif (
             right_pt is not None
             and np.sign(nadia_original.deviation(f, S, i, right_pt)) == t_star_sign
@@ -84,7 +81,6 @@ def exchange(i, t_star, d_star, f, S, basis, knots, n):
         if t_tilde is None and n == 1:
             if t_star < basis_points[0]:
                 end_pt = basis_points[-1]
-
             elif t_star > basis_points[-1]:
                 end_pt = basis_points[0]
             else:
@@ -159,6 +155,7 @@ if __name__ == "__main__":
     print(f"Function: {function_name}")
     print(f"Knots: {knots}")
 
+    # Pass the modified exchange function to gra
     result = nadia_original.gra(f, knots, m, n, exchange_function=exchange)
 
     if result["exit_type"] == 1:
@@ -188,15 +185,15 @@ if __name__ == "__main__":
         file_name=f"mod_{function_name}_a{a}_b{b}_k{k}_m{m}.png",
     )
 
-    plotting.plot_report(
-        f,
-        result["S"],
-        a,
-        b,
-        knots=knots,
-        points=result["alternance_points"],
-        f_label=f_label,
-        approximation_label=rf"$S_{{{m}}}(t)$",
-        points_label="Alternance points",
-        file_name=f"r_mod_{function_name}_k{k}_m{m}.png",
-    )
+    # plotting.plot_report(
+    #     f,
+    #     result["S"],
+    #     a,
+    #     b,
+    #     knots=knots,
+    #     points=result["alternance_points"],
+    #     f_label=f_label,
+    #     approximation_label=rf"$S_{{{m}}}(t)$",
+    #     points_label="Alternance points",
+    #     file_name=f"mod_report_{function_name}_k{k}_m{m}.png",
+    # )
