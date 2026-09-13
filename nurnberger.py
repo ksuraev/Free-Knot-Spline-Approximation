@@ -1,7 +1,9 @@
-import matplotlib.pyplot as plt
+# Original Nurnberger algorithm
 import numpy as np
 
+import plotting
 import remez
+import test_functions
 
 
 def d(f, a, b, degree):
@@ -25,7 +27,7 @@ def step_zero(f, a, b, k, degree):
     return knots, d_min, d_max
 
 
-def run(f, a, b, k, degree, use_last_alt_pt, tolerance=1e-6, max_iter=100):
+def run(f, a, b, k, degree, tolerance=1e-6, max_iter=100):
     """Run the Nurnberger algorithm to find the optimal placement of k free knots in the interval [a,b] for polynomial approximation of degree 'degree'."""
     knots, d_min, d_max = step_zero(f, a, b, k, degree)
 
@@ -61,13 +63,8 @@ def run(f, a, b, k, degree, use_last_alt_pt, tolerance=1e-6, max_iter=100):
                 else:
                     x_u = x_bar
 
-            if use_last_alt_pt:
-                new_knot = alt_pts[-1]
-                new_knots.append(new_knot)
-                x_i = new_knot
-            else:
-                new_knots.append(x_bar)
-                x_i = x_bar
+            new_knots.append(x_bar)
+            x_i = x_bar
 
             j += 1
 
@@ -87,48 +84,46 @@ def run(f, a, b, k, degree, use_last_alt_pt, tolerance=1e-6, max_iter=100):
     return knots, d_min, d_max
 
 
-def plot(f, knots, degree, a, b, plot_name):
-    piecewise_polynomial = []
-    for i in range(len(knots) - 1):
-        P, _, _ = remez.remez(f, knots[i], knots[i + 1], degree)
-        piecewise_polynomial.append((knots[i], knots[i + 1], P))
-
-    fig, ax = plt.subplots(figsize=(10, 6))
-
-    # original function f(x)
-    x = np.arange(a, b, 0.01)
-    ax.plot(x, f(x), color="slategray", label="f(x)")
-
-    # approximation polynomial P(x) over each interval
-    for start, end, P in piecewise_polynomial:
-        x = np.arange(start, end, 0.01)
-        ax.plot(
-            x, P(x), color="dodgerblue", label="P(x)" if start == knots[0] else None
-        )
-
-    for x in knots:
-        ax.axvline(x, color="red", ls=":", label="knots" if x == knots[0] else None)
-
-    ax.set_title(f"Degree-{degree} approximation with {k} free knots")
-    ax.legend(loc="best")
-    fig.tight_layout()
-    fig.savefig(plot_name)
-    plt.show()
-
-
 if __name__ == "__main__":
+    function_name = "g"
+    f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
-    def f(x):
-        return np.sin(x)
-
-    a, b = 0, 6
-    k = 2  # number of free knots (not including a and b)
+    a, b = -1, 1
+    k = 1  # number of free knots (not including a and b)
     degree = 1  # degree of polynomial to fit
 
-    knots, d_min, d_max = run(f, a, b, k, degree, False)
-    print(f"x_bar knots:       {knots}. Max and min d: {d_max:.8f}, {d_min:.8f}")
-    # plot(knots, degree, a, b, "xbar_knots.png")
+    knots, d_min, d_max = run(f, a, b, k, degree)
 
-    knots, d_min, d_max = run(f, a, b, k, degree, True)
-    print(f"Last alt pt knots: {knots}. Max and min d: {d_max:.8f}, {d_min:.8f}")
-    # plot(knots, degree, a, b, "last_alt_knots.png")
+    polynomials = []
+    alt_pts = []
+
+    for i in range(len(knots) - 1):
+        P, _, alt = remez.remez(
+            f,
+            knots[i],
+            knots[i + 1],
+            degree,
+        )
+        polynomials.append(P)
+        alt_pts.extend(alt)
+
+    print(f"Max deviation: {d_max}")
+    print(f"knots: {knots}")
+    print(f"Alternance points: {alt_pts}")
+
+    def S(i, t):
+        return polynomials[i](t)
+
+    plotting.plot_detailed(
+        f,
+        S,
+        a,
+        b,
+        knots=knots,
+        points=alt_pts,
+        f_label=f_label,
+        approximation_label="Piecewise polynomial approximation",
+        points_label="Alternance points",
+        title=f"Degree-{degree} approximation with {len(knots) - 2} free knots. Max abs deviation: {d_max:.5f}.",
+        file_name=f"nurnberger_{function_name}_a{a}_b{b}_k{k}_m{degree}.png",
+    )

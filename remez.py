@@ -1,10 +1,14 @@
-import matplotlib.pyplot as plt
 import numpy as np
 import Spline
 
+import helper
+import plotting
+import test_functions
+
+CONVERGENCE_TOL = 1e-14
+
 
 def calculate_polynomial(f, xn, n):
-
     # Initialise matrix A and vector b
     A = np.zeros((n + 2, n + 2))
     b = np.zeros(n + 2)
@@ -36,10 +40,10 @@ def calculate_polynomial(f, xn, n):
     return P, E
 
 
-def exchange(xn, x_new, e_max, errors):
+def exchange(xn, x_new, d_max, errors):
     # If the new point is outside the leftmost point
     if x_new < xn[0]:
-        if np.sign(e_max) == np.sign(errors[0]):
+        if np.sign(d_max) == np.sign(errors[0]):
             # replace the leftmost point
             xn[0] = x_new
         else:
@@ -48,7 +52,7 @@ def exchange(xn, x_new, e_max, errors):
 
     # If the new point is outside the rightmost point
     elif x_new > xn[-1]:
-        if np.sign(e_max) == np.sign(errors[-1]):
+        if np.sign(d_max) == np.sign(errors[-1]):
             # replace the rightmost point
             xn[-1] = x_new
         else:
@@ -61,7 +65,7 @@ def exchange(xn, x_new, e_max, errors):
             if xn[i] < x_new < xn[i + 1]:
 
                 # Replace with the closest point with same sign
-                if np.sign(e_max) == np.sign(errors[i]):
+                if np.sign(d_max) == np.sign(errors[i]):
                     xn[i] = x_new
                 else:
                     xn[i + 1] = x_new
@@ -75,29 +79,22 @@ def remez(f, a, b, n, tol=1e-6, max_iter=10000):
     for i in range(max_iter):
         P, E = calculate_polynomial(f, xn, n)
 
-        # Discretise the interval into 10,000 points
-        x_samples = np.linspace(a, b, 10000)
-        e_samples = f(x_samples) - P(x_samples)
-
-        # Find the absolute maximum error value (deviation)
-        abs_errors = np.abs(e_samples)
-        max_idx = np.argmax(abs_errors)
-
-        x_max = x_samples[max_idx]
-        e_max = e_samples[max_idx]
+        # Find maximum absolute deviation over [a, b]
+        _, _, (_, x_max, d_max) = helper.find_extrema_overall(
+            lambda i, t: f(t) - P(t), [a, b]
+        )
 
         # Check for convergence - Trefethen paper
-        if abs(E) < 1e-14:
-            converged = abs(e_max) < 1e-14
+        if abs(E) < CONVERGENCE_TOL:
+            converged = abs(d_max) < CONVERGENCE_TOL
         else:
-            C = abs(e_max) / abs(E)
-            converged = C <= 1 + tol
+            converged = abs(d_max) - abs(E) <= tol * abs(E)
         if converged:
-            return P, e_max, xn
+            return P, d_max, xn
 
         # Update the references points using single point exchange
         errors = f(xn) - P(xn)
-        xn = exchange(xn, x_max, e_max, errors)
+        xn = exchange(xn, x_max, d_max, errors)
 
     approx = Spline.Approximation(f, P, [a, b], xn)
     return approx
@@ -124,16 +121,28 @@ def plot(f, P, xn, a, b, n, plot_name):
     fig.tight_layout()
     fig.savefig(plot_name)
     plt.show()
+    return P, d_max, xn
 
 
 if __name__ == "__main__":
+    function_name = "g"
+    f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
-    def f(x):
-        return np.sin(x)
+    a, b = -1, 1
+    m = 10
+    P, d_max, alt_pts = remez(f, a, b, m)
 
-    a, b = 0, 4
-    n = 2
-    P, e_max, xn = remez(f, a, b, n)
-    print(f"Max error: {e_max}")
-    print(f"Alternance points: {xn}")
-    # plot(f, P, xn, a, b, n, "remez.png")
+    print(f"Max abs deviation: {d_max}")
+    print(f"Alternance points: {alt_pts}")
+
+    plotting.plot_report(
+        f,
+        P,
+        a,
+        b,
+        knots=None,
+        points=alt_pts,
+        f_label=f_label,
+        approximation_label=rf"$P_{{{m}}}(t)$",
+        file_name=f"remez_report_{function_name}_a{a}_b{b}_m{m}_report.png",
+    )

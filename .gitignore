@@ -5,3 +5,8 @@ __pycache__
 report/
 *.csv
 ignore/
+.DS_Store
+old_csv/
+old_plots/
+plots
+report_plot.py
