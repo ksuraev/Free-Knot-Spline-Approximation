@@ -82,9 +82,6 @@ def find_alternance_points(
     # Find local extrema in each interval
     for i in range(len(knots) - 1):
 
-        def local_deviation(t, i=i):
-            return deviation_function(i, t)
-
         extrema = find_local_abs_deviation_maxima(
             deviation_function, i, knots[i], knots[i + 1], n_samples=n_samples
         )
