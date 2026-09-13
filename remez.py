@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import Spline
 
 
 def calculate_polynomial(f, xn, n):
@@ -30,7 +31,7 @@ def calculate_polynomial(f, xn, n):
     E = solution[-1]
 
     # Create polynomial function from coefficients
-    P = np.polynomial.Polynomial(coeffs)
+    P = Spline.Polynomial(coeffs)
 
     return P, E
 
@@ -98,7 +99,10 @@ def remez(f, a, b, n, tol=1e-6, max_iter=10000):
         errors = f(xn) - P(xn)
         xn = exchange(xn, x_max, e_max, errors)
 
-    return P, e_max, xn
+    approx = Spline.Approximation(f, P, [a, b], xn)
+    return approx
+
+    # return P, e_max, xn
 
 
 def plot(f, P, xn, a, b, n, plot_name):
