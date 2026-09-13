@@ -4,7 +4,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-import nadia_exchange_mod
+import nadia_mod
 import nurnberger_mod
 import plotting
 import remez
@@ -21,9 +21,7 @@ def fixed_left_tail(f, a, theta, b, m, n):
     P_left, d_left, alt_left = remez.remez(f, a, theta, m)
 
     # Run GRA on the right interval [theta, b] with fixed left value P_left(theta)
-    fixed_left = nadia_exchange_mod.gra(
-        f, [theta, b], m, 1, fixed_left_value=P_left(theta)
-    )
+    fixed_left = nadia_mod.gra(f, [theta, b], m, 1, fixed_left_value=P_left(theta))
 
     # Spline function combining the left polynomial and the right spline
     def S(i, t):
@@ -55,9 +53,7 @@ def fixed_right_tail(f, a, theta, b, m, n):
     P_right, d_right, alt_right = remez.remez(f, theta, b, m)
 
     # Run GRA on the left interval [a, theta] with fixed right value P_right(theta)
-    fixed_right = nadia_exchange_mod.gra(
-        f, [a, theta], m, 1, fixed_right_value=P_right(theta)
-    )
+    fixed_right = nadia_mod.gra(f, [a, theta], m, 1, fixed_right_value=P_right(theta))
 
     # Spline function combining the left spline and the right polynomial
     def S(i, t):
@@ -80,7 +76,7 @@ def fixed_right_tail(f, a, theta, b, m, n):
 
 
 def psi_with_swap(f, a, b, theta, m, n):
-    two_int_chain = nadia_exchange_mod.gra(f, [a, theta, b], m, n)
+    two_int_chain = nadia_mod.gra(f, [a, theta, b], m, n)
 
     # Case 1: found optimal spline across two intervals
     if two_int_chain["exit_type"] == 1:
@@ -149,7 +145,7 @@ def psi_with_swap(f, a, b, theta, m, n):
 
 
 # def psi_without_swap(f, a, b, theta, m, n):
-#     two_int_chain = nadia_exchange_mod.gra(f, [a, theta, b], m, n)
+#     two_int_chain = nadia_mod.gra(f, [a, theta, b], m, n)
 
 #     # Case 1: found optimal spline across two intervals
 #     if two_int_chain["exit_type"] == 1:
