@@ -3,13 +3,14 @@ import numpy as np
 
 def find_local_abs_deviation_maxima(
     deviation_function,
+    i,
     start,
     end,
     n_samples=10000,
 ):
     t_samples = np.linspace(start, end, n_samples)
 
-    d_samples = np.array([deviation_function(t) for t in t_samples])
+    d_samples = np.array([deviation_function(i, t) for t in t_samples])
 
     abs_d_samples = np.abs(d_samples)
 
@@ -103,7 +104,11 @@ def find_alternance_points(
             return deviation_function(i, t)
 
         extrema = find_local_abs_deviation_maxima(
-            local_deviation, knots[i], knots[i + 1], n_samples=n_samples
+            deviation_function,
+            i,
+            knots[i],
+            knots[i + 1],
+            n_samples=n_samples,
         )
 
         all_extrema.extend(extrema)
