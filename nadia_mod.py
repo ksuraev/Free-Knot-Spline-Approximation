@@ -58,7 +58,7 @@ def step_one(knots, basis, m, n, f, fixed_left_value=None, fixed_right_value=Non
     A = np.concatenate(
         [
             np.ones((total_rows, 1)),
-            nadia.build_P_matrix(temp_basis, knots, m),
+            nadia.build_P(temp_basis, knots, m),
             np.zeros((total_rows, 1)),
         ],
         axis=1,
