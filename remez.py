@@ -1,11 +1,11 @@
-import matplotlib.pyplot as plt
 import numpy as np
 
+import helper
+import plotting
 import test_functions
 
 
 def calculate_polynomial(f, xn, n):
-
     # Initialise matrix A and vector b
     A = np.zeros((n + 2, n + 2))
     b = np.zeros(n + 2)
@@ -76,16 +76,10 @@ def remez(f, a, b, n, tol=1e-6, max_iter=10000):
     for i in range(max_iter):
         P, E = calculate_polynomial(f, xn, n)
 
-        # Discretise the interval into 10,000 points
-        x_samples = np.linspace(a, b, 10000)
-        d_samples = f(x_samples) - P(x_samples)
-
-        # Find the absolute maximum error value (deviation)
-        abs_errors = np.abs(d_samples)
-        max_idx = np.argmax(abs_errors)
-
-        x_max = x_samples[max_idx]
-        d_max = d_samples[max_idx]
+        # Find maximum absolute deviation over [a, b]
+        _, _, (_, x_max, d_max) = helper.find_extrema_overall(
+            lambda i, t: f(t) - P(t), [a, b]
+        )
 
         # Check for convergence - Trefethen paper
         if abs(E) < 1e-14:
@@ -102,66 +96,26 @@ def remez(f, a, b, n, tol=1e-6, max_iter=10000):
     return P, d_max, xn
 
 
-def plot(f, f_label, P, xn, a, b, n, plot_name, knots=None):
-    fig, ax = plt.subplots(figsize=(7, 5))
-
-    # original function f(x)
-    x = np.linspace(a, b, 1000)
-    ax.plot(x, f(x), color="darkslategray", label=f_label)
-
-    # approximation polynomial P(x)
-    ax.plot(
-        x,
-        P(x),
-        linewidth=2,
-        color="cornflowerblue",
-        label=rf"$P_{{{n}}}(t)$",
-    )
-    if knots is not None:
-        for j, knot in enumerate(knots):
-            ax.axvline(
-                knot,
-                color="red",
-                lw=0.5,
-                alpha=0.6,
-                label="Knots" if j == 0 else None,
-            )
-    # alternance points
-    for x_i in xn:
-        y_f = f(x_i)
-        y_p = P(x_i)
-
-        # point on P
-        ax.scatter(x_i, y_p, color="black", s=30, zorder=5)
-
-        # deviation between f and P
-        ax.plot(
-            [x_i, x_i],
-            [y_p, y_f],
-            color="black",
-            linestyle=(0, (8, 5)),
-            linewidth=0.8,
-            alpha=0.7,
-        )
-    # ax.set_title(f"Remez degree {n} approximation.")
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    for spine in ax.spines.values():
-        spine.set_linewidth(0.6)
-    ax.tick_params(axis="both", which="major", labelsize=14)
-    ax.legend(fontsize=15, frameon=False, loc="best")
-    fig.tight_layout()
-    fig.savefig(plot_name, dpi=300, bbox_inches="tight")
-    # plt.show()
-
-
 if __name__ == "__main__":
     function_name = "g"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
     a, b = -1, 1
-    m = 50
-    P, d_max, xn = remez(f, a, b, m)
-    print(f"Max error: {d_max}")
-    print(f"Alternance points: {xn}")
-    plot(f, f_label, P, xn, a, b, m, f"remez_{function_name}_m{m}_a{a}_b{b}.png")
+    m = 10
+    P, d_max, alt_pts = remez(f, a, b, m)
+
+    print(f"Max abs deviation: {d_max}")
+    print(f"Alternance points: {alt_pts}")
+
+    plotting.plot_report(
+        f,
+        P,
+        a,
+        b,
+        knots=None,
+        points=alt_pts,
+        f_label=f_label,
+        approximation_label=rf"$P_{{{m}}}(t)$",
+        points_label="Alternance points",
+        file_name=f"r_remez_{function_name}_a{a}_b{b}_m{m}_report.png",
+    )
