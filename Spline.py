@@ -16,16 +16,31 @@ class Polynomial(np.polynomial.Polynomial):
                  coefficients,
                  domain=None,
                  window=None,
-                 symbol='t',
+                 symbol="t",
                  offset=0):
         super().__init__(coefficients, domain, window, symbol)
         self.offset = offset
 
     def addoffset(self, theta):
-        return Polynomial(self.coef,
-                          domain=self.domain,
-                          window=self.window,
-                          symbol=self.symbol,
+        """Add an offset to the polynomial, keeping the coefficients."""
+        return Polynomial(
+            self.coef,
+            domain=self.domain,
+            window=self.window,
+            symbol=self.symbol,
+            offset=theta,
+        )
+
+    def rebase(self, theta=0):
+        """Return the same polynomial, but with a different basis of `t-θ`."""
+        coefs = [
+            1 / factorial(i) * self.deriv(i)(theta)
+            for i in range(self.degree() + 1)
+        ]
+        return Polynomial(coefs,
+                          self.domain,
+                          self.window,
+                          self.symbol,
                           offset=theta)
 
     def deriv(self, m=1):
@@ -47,103 +62,107 @@ class Polynomial(np.polynomial.Polynomial):
         assert False, "TODO"
 
     def __call__(self, t):
-        return super().__call__(t-self.offset)
+        return super().__call__(t - self.offset)
 
 
 class Spline:
-    """ A Spline function """
+    """A Spline function"""
 
     def __init__(self, knots, polynomials):
         """A spline is made of knots, so that between any pair of subsequent
-           knots it is equal to a polynomial."""
+        knots it is equal to a polynomial."""
 
-        assert len(knots) == len(polynomials) + 1, (
-            "The number of polynomials must equal the number of subintervals.")
+        assert (
+            len(knots) == len(polynomials) + 1
+        ), "The number of polynomials must equal the number of subintervals."
 
         self.knots = knots
-        self.polynomials = [v if isinstance(v, Polynomial) else
-                            Polynomial(v) for v in polynomials]
+        self.polynomials = np.array(
+            [v if isinstance(v, Polynomial) else Polynomial(v)
+             for v in polynomials]
+        )
 
         # We work out the degree of the spline from the degrees
         # of the polynomial pieces:
         degrees = [v.degree() for v in self.polynomials]
         self.degree = np.max(degrees)
 
-        assert all(degrees == self.degree), (
-            "Spline polynomials must all have the same degree.")
+        assert all(
+            degrees == self.degree
+        ), "Spline polynomials must all have the same degree."
 
     def nintervals(self):
         return len(self.polynomials)
 
     def __call__(self, t):
-        """ Evaluate the spline at point t """
+        """Evaluate the spline at point t"""
 
-        assert ((t >= self.knots[0]) and (t <= self.knots[-1])), (
-             "Value outside of Spline interval.")
+        assert (t >= self.knots[0]) and (
+            t <= self.knots[-1]
+        ), "Value outside of Spline interval."
 
         # Find the subinterval containing `t`.
         k = np.where(self.knots[:-1] <= t)[0][-1]
         return self.polynomials[k](t)
 
     def is_continuous(self):
-        """ returns true if the spline is continuous at the knots. """
-        return all(self.polynomials[k](theta) == self.polynomials[k+1](theta)
-                   for k, theta in enumerate(self.knots[1:-1]))
+        """returns true if the spline is continuous at the knots."""
+        return all(
+            self.polynomials[k](theta) == self.polynomials[k + 1](theta)
+            for k, theta in enumerate(self.knots[1:-1])
+        )
 
     def concatenate(this, S):
         """Concatenate two splines"""
 
-        assert (this.knots[-1] == S.knots[0]), (
-            "The splines' intervals are not adjacent.")
+        assert this.knots[-1] == S.knots[0], (
+                "The splines' intervals are not adjacent.")
 
-        return Spline(np.concatenate([this.knots, S.knots[1:]]),
-                      np.concatenate([this.polynomials, S.polynomials]))
+        return Spline(
+            np.concatenate([this.knots, S.knots[1:]]),
+            np.concatenate([this.polynomials, S.polynomials]),
+        )
 
-    def __repr__(self):
-        return '\n'.join([f"[{self.knots[i]}, {self.knots[i+1]}): \
-                         {p}" for i, p in enumerate(self.polynomials)])
+    def __str__(self):
+        return "\n".join([f"[{self.knots[i]}, {self.knots[i+1]}): \
+                         {p}" for i, p in enumerate(self.polynomials)]) + '\n'
 
+    # This should ideally return an Approximation object.
     @classmethod
     def interpolate(f, points):
-        """Interpolate the function `f` through the points."""
+        """Interpolate the function `f` through the given points."""
         assert False, "TODO"
 
-    def to_SUSpline(self):
-        """ Convert a Spline to a SUSpline """
-        coefs = [[1/factorial(i) * (p -
-                 (0 if j == 0 else self.polynomials[j-1])).deriv(i)(theta)
-                 for i in range(p.degree()+1)]
-                 for j, p, theta in
-                 zip(range(self.nintervals()), self.polynomials, self.knots)]
+    def to_SSpline(self):
+        """Convert a spline to the format used in Sukhorukova, 2010."""
+        polynomials = [p.rebase(theta)
+                       for p, theta in zip(self.polynomials, self.knots)]
+        return Spline(self.knots, polynomials)
 
-        polynomials = [Polynomial(c, offset=theta)
-                       for c, theta in zip(coefs, self.knots)]
+    def to_SUSpline(self):
+        """Convert a Spline to a SUSpline"""
+        cumulative = [self.polynomials[0]] + list(
+            self.polynomials[1:] - self.polynomials[:-1]
+        )
+        polynomials = [p.rebase(theta)
+                       for p, theta in zip(cumulative, self.knots)]
         return SUSpline(self.knots, polynomials)
-        polynomials = []
-        derivatives = [[] for i in range(self.degree)]
-        for theta, p in zip(self.knots, self.polynomials):
-            c = []
-            pd = p
-            for i in range(self.degree):
-                c.append(1/factorial(i)*(pd(theta) - sum(q(theta)
-                         for q in derivatives[i])))
-                pd = pd.deriv()
-            newp = Polynomial(c, offset=theta)
-            polynomials.append(newp)
-            derivatives[0].append(newp)
-            for i in range(1, self.degree):
-                derivatives[i].append(derivatives[i-1][-1].deriv())
-        return SUSpline(self.knots, polynomials)
+
+    def rebase(self, theta=0):
+        """Rewrite the spline so all polynomial pieces use the same basis."""
+        polynomials = [p.rebase(theta) for p in self.polynomials]
+        return Spline(self.knots, polynomials)
 
 
 class SUSpline(Spline):
     """A spline whose formula is as in Sukhorukova & Ugon, 2017"""
 
     def __call__(self, t):
-        """ Evaluate the spline at point `t`. """
+        """Evaluate the spline at point `t`."""
 
-        assert ((t >= self.knots[0]) and (t <= self.knots[-1])), (
-             "Value outside of Spline interval.")
+        assert (t >= self.knots[0]) and (
+            t <= self.knots[-1]
+        ), "Value outside of Spline interval."
 
         return sum(p(t) for p in self.polynomials if t >= p.offset)
 
