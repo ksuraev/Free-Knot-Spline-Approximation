@@ -10,7 +10,7 @@ def find_local_abs_deviation_maxima(
 ):
     t_samples = np.linspace(start, end, n_samples)
 
-    d_samples = np.array([deviation_function(i, t) for t in t_samples])
+    d_samples = deviation_function(i, t_samples)
 
     abs_d_samples = np.abs(d_samples)
 
@@ -62,7 +62,7 @@ def find_extrema_overall(
                 n_samples,
             )[1:]
 
-        d_samples = np.array([deviation_function(i, t) for t in t_samples])
+        d_samples = deviation_function(i, t_samples)
 
         idx_max = np.argmax(d_samples)
         idx_min = np.argmin(d_samples)
