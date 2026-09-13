@@ -1,15 +1,16 @@
-# Rename file
+# Nadia's algorithm with basis exchange modifications ONLY
+# Rename file eventually
 # Modified exchange() to allow basis point to be replaced by internal knot and fixed tails
 # and allow cyclic exchange for single interval problems
-import nadia_original
 import numpy as np
 
-from .. import plotting, test_functions
+import nadia_original
+import plotting
+import test_functions
 
 TOL = 1e-5
 
 
-# allow basis point to be replaced by internal knot
 def exchange(i, t_star, d_star, f, S, basis, knots, n):
 
     t_star_sign = np.sign(d_star)
@@ -38,8 +39,8 @@ def exchange(i, t_star, d_star, f, S, basis, knots, n):
         left_pt = basis[left_i][-1]
         right_pt = basis[right_i][0]
 
-        left_sign = np.sign(nadia_original.deviation(f, S, left_i, left_pt))
-        right_sign = np.sign(nadia_original.deviation(f, S, right_i, right_pt))
+        left_sign = np.sign(nadia_original.deviation(f, S, left_pt))
+        right_sign = np.sign(nadia_original.deviation(f, S, right_pt))
 
         # update i to the interval of the basis point that has the same sign as t*
         if left_sign == t_star_sign:
@@ -91,7 +92,7 @@ def exchange(i, t_star, d_star, f, S, basis, knots, n):
 
             if (
                 end_pt is not None
-                and np.sign(nadia_original.deviation(f, S, i, end_pt)) == t_star_sign
+                and np.sign(nadia_original.deviation(f, S, end_pt)) == t_star_sign
             ):
                 t_tilde = end_pt
 
@@ -123,17 +124,37 @@ def exchange(i, t_star, d_star, f, S, basis, knots, n):
     return new_basis
 
 
+def gra(
+    f,
+    knots,
+    m,
+    n,
+    exchange_function=exchange,
+    fixed_left_value=None,
+    fixed_right_value=None,
+):
+    return nadia_original.gra(
+        f,
+        knots,
+        m,
+        n,
+        exchange_function=exchange_function,
+        fixed_left_value=fixed_left_value,
+        fixed_right_value=fixed_right_value,
+    )
+
+
 if __name__ == "__main__":
     function_name = "g"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
     a, b = -1, 1
-    k = 9
+    k = 1
     m = 1
     n = k + 1
 
     # Choose initial knots
-    knots = np.linspace(a, b, k + 2)
+    knots = [a, 0.38, b]
 
     print(f"Function: {function_name}")
     print(f"Knots: {knots}")
@@ -148,6 +169,7 @@ if __name__ == "__main__":
     print(f"Max abs deviation: {result["d_max"]:.5f} at t = {result["t_star"]:.5f}")
 
     status = "Optimal" if result["exit_type"] == 1 else "Non-optimal"
+
     plotting.plot_detailed(
         f,
         result["S"],
@@ -166,15 +188,15 @@ if __name__ == "__main__":
         file_name=f"mod_{function_name}_a{a}_b{b}_k{k}_m{m}.png",
     )
 
-    # plotting.plot_report(
-    #     f,
-    #     result["S"],
-    #     a,
-    #     b,
-    #     knots=knots,
-    #     points=result["alternance_points"],
-    #     f_label=f_label,
-    #     approximation_label=rf"$S_{{{m}}}(t)$",
-    #     points_label="Alternance points",
-    #     file_name=f"r_mod_{function_name}_k{k}_m{m}.png",
-    # )
+    plotting.plot_report(
+        f,
+        result["S"],
+        a,
+        b,
+        knots=knots,
+        points=result["alternance_points"],
+        f_label=f_label,
+        approximation_label=rf"$S_{{{m}}}(t)$",
+        points_label="Alternance points",
+        file_name=f"r_mod_{function_name}_k{k}_m{m}.png",
+    )
