@@ -3,7 +3,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-import report_plot
 import test_functions
 
 TOL = 1e-5
@@ -514,7 +513,7 @@ if __name__ == "__main__":
 
     a, b = -1, 1
     k = 8  # number of internal fixed knots
-    m = 2  # degree of polynomial to fit in each subinterval
+    m = 1  # degree of polynomial to fit in each subinterval
     n = k + 1  # number of subintervals
 
     # Choose intial knots
@@ -531,7 +530,8 @@ if __name__ == "__main__":
     print("alternance points:", result["alternance_points"])
     print(f"Max abs deviation: {result["d_max"]:.5f} at t = {result["t_star"]:.5f}")
 
-    report_plot.plot(
+    status = "Optimal" if result["optimal"] else "Not optimal"
+    plot(
         f,
         f_label,
         a,
@@ -542,22 +542,7 @@ if __name__ == "__main__":
         result["basis"],
         m,
         k,
-        f"gra_og_{function_name}_a{a}_b{b}_k{k}_m{m}.png",
+        result["d_max"],
+        status,
+        f"orig_{function_name}_k{k}_m{m}.png",
     )
-
-    # status = "Optimal" if result["optimal"] else "Not optimal"
-    # plot(
-    #     f,
-    #     f_label,
-    #     a,
-    #     b,
-    #     n,
-    #     result["S"],
-    #     knots,
-    #     result["basis"],
-    #     m,
-    #     k,
-    #     result["d_max"],
-    #     status,
-    #     f"orig_{function_name}_k{k}_m{m}.png",
-    # )
