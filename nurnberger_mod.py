@@ -10,10 +10,6 @@ ALTERNANCE_TOL = 1e-4
 TOL = 1e-5
 
 
-def deviation(f, P, t):
-    return f(t) - P(t)
-
-
 def subroutine(f, x_i, b, degree, d_n, max_iter):
     """Find x_min and x_max for the next interval."""
     d_i, _ = nurnberger.d(f, x_i, b, degree)
