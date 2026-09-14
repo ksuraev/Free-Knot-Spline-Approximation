@@ -1,6 +1,5 @@
 import numpy as np
 
-import helper
 import nurnberger
 import plotting
 import remez
@@ -17,28 +16,33 @@ def deviation(f, P, t):
 
 def subroutine(f, x_i, b, degree, d_n, max_iter):
     """Find x_min and x_max for the next interval."""
-
     d_i, _ = nurnberger.d(f, x_i, b, degree)
 
+    # If the deviation on [x_i, b] is less than or equal to d_n, then no new knot can be placed in this interval
     if d_i <= d_n:
         return None
 
+    # Set upper and lower bounds for bisection search
     x_l = x_i
     x_u = b
 
     for _ in range(max_iter):
         x_bar = (x_l + x_u) / 2
 
+        # Compute the maximum deviation on [x_i, x_bar]
         d_i_max, approx = nurnberger.d(f, x_i, x_bar, degree)
 
+        # If the upper and lower bounds are sufficiently close, we have found x_max
         if x_u - x_l < TOL:
             break
 
+        # Determine which half of the interval to keep based on the deviation
         if d_i_max <= d_n + TOL:
             x_l = x_bar
         else:
             x_u = x_bar
 
+    # x_max is the upper bound of the last interval where the deviation was less than or equal to d_n
     x_max = x_l
 
     # Approximation on [x_i, x_max] is used to find the (degree + 2)-th alternance point
