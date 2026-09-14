@@ -23,7 +23,6 @@ def fixed_left_tail(f, a, theta, b, m):
     # Combine the left polynomial and right spline
     S_left = Spline.Spline([a, theta], [left_approx.g])
     S = S_left.concatenate(right_approx.g)
-    S = S.to_SUSpline()
 
     # Combine their bases
     basis = [left_approx.basis, right_approx.basis[0]]
@@ -58,7 +57,6 @@ def fixed_right_tail(f, a, theta, b, m):
     # Combine the left spline and right polynomial
     S_right = Spline.Spline([theta, b], [right_approx.g])
     S = left_approx.g.concatenate(S_right)
-    S = S.to_SUSpline()
 
     # Combine bases
     basis = [left_approx.basis[0], right_approx.basis]
@@ -213,10 +211,7 @@ def opt(
 
         if verbose:
             print(
-                f"k={k}, theta={theta:.10f}, "
-                f"psi={psi_theta:.10f}, "
-                f"g_plus={g_plus:.10f}, "
-                f"g_minus={g_minus:.10f}"
+                f"k={k}, theta={theta:.10f}, psi={psi_theta:.10f} g_plus={g_plus:.10f}, g_minus={g_minus:.10f}"
             )
 
         if g_plus <= g_minus:
@@ -239,18 +234,20 @@ def opt(
     else:
         print(f"Maximum iterations ({max_iter}) reached in opt()")
 
-    psi_theta = psi(f, a, b, theta, m, n)["d_max"]
+    psi_theta = psi(f, a, b, theta, m, n)
 
     return theta, psi_theta
 
 
-def plot_psi(f, f_label, a, b, m, n, theta_start, theta_end, file_name, step=0.05):
+def plot_psi(
+    f, f_label, a, b, m, n, theta_start, theta_end, file_name, step=0.05, verbose=False
+):
     thetas = np.arange(theta_start, theta_end, step)
 
     psi_values = []
 
     for theta in thetas:
-        result = psi(f, a, b, theta, m, n)["d_max"]
+        result = psi(f, a, b, theta, m, n, verbose=verbose)["d_max"]
         psi_values.append(result)
 
     plt.figure(figsize=(8, 6))
@@ -299,9 +296,10 @@ if __name__ == "__main__":
 
     # Find optimal theta
     theta_opt, psi_result = opt(f, a, b, m, n, x_min, x_max)
-    psi_val = psi_result["approximation"].maxdeviation()[2]
 
-    print(f"optimal theta: {theta_opt:.10f}, psi(theta_opt): {psi_val:.10f}")
+    print(
+        f"optimal theta: {theta_opt:.10f}, psi(theta_opt): {psi_result['d_max']:.10f}"
+    )
 
     def case(case_num):
         if case_num == 1:
@@ -325,36 +323,10 @@ if __name__ == "__main__":
         title=(
             f"Degree-{m} spline approximation of {f_label}. "
             f"{k} internal knots ({status}). "
-            f"Max abs deviation: {psi_val:.5f}."
+            f"Max abs deviation: {psi_result['d_max']:.5f}."
         ),
         file_name=f"duo_alg_{function_name}_k{k}_m{m}.png",
     )
-
-    # # gradient test shit
-    # result = psi_with_swap(f, a, b, 7, m, n)
-    # print(f"result: {result}")
-    # # G = nadia.build_gradients(
-    # #     result["alternance_points"], result["knots"], m, a, result["signs"]
-    # # )
-    # d2 = nadia.find_descent_direction(
-    #     result["alternance_points"],
-    #     result["knots"],
-    #     m,
-    #     result["coeffs"],
-    #     result["signs"],
-    # )
-
-    # print(f"descent direction: {d2}")
-
-    # status = (
-    #     f"optimal, {case(result['case'])}"
-    #     if result["optimal"]
-    #     else f"not optimal, {case(result['case'])}"
-    # )
-
-    # r = psi_with_swap(f, a, b, 7, m, n)
-    # d = directional_derivative(f, a, b, 7, r["d_max"], m, n, 0.01)
-    # print(d)
 
     # psi plot with swap
     # start_theta = a + 0.1
