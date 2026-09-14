@@ -1,4 +1,5 @@
 import numpy as np
+import Spline
 
 import helper
 import plotting
@@ -34,7 +35,7 @@ def calculate_polynomial(f, xn, n):
     E = solution[-1]
 
     # Create polynomial function from coefficients
-    P = np.polynomial.Polynomial(coeffs)
+    P = Spline.Polynomial(coeffs)
 
     return P, E
 
@@ -95,6 +96,31 @@ def remez(f, a, b, n, tol=1e-6, max_iter=10000):
         errors = f(xn) - P(xn)
         xn = exchange(xn, x_max, d_max, errors)
 
+    approx = Spline.Approximation(f, P, [a, b], xn)
+    return approx
+
+    # return P, e_max, xn
+
+
+def plot(f, P, xn, a, b, n, plot_name):
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    # original function f(x)
+    x = np.linspace(a, b, 1000)
+    ax.plot(x, f(x), color="slategray", label="f(x)")
+
+    # approximation polynomial P(x)
+    ax.plot(x, P(x), color="dodgerblue", label="P(x)")
+
+    # alternance points
+    for x in xn:
+        ax.axvline(x=x, color="lightgray", linestyle="--", alpha=0.5)
+
+    ax.set_title(f"Remez approximation of degree {n}")
+    ax.legend(loc="best")
+    fig.tight_layout()
+    fig.savefig(plot_name)
+    plt.show()
     return P, d_max, xn
 
 
