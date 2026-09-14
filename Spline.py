@@ -193,7 +193,6 @@ class Approximation:
 
     def _extrema(self, n_samples=10000):
         """Return local maxima of absolute deviation as (i, t, d)."""
-
         knots = self.g.knots if hasattr(self.g, "knots") else self.interval
         extrema = []
 
@@ -239,7 +238,6 @@ class Approximation:
 
     def maxdeviationpoints(self, tol=1e-5, n_samples=10000):
         """Return all points attaining the maximum absolute deviation."""
-
         extrema = self._extrema(n_samples)
 
         if not extrema:
