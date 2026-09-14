@@ -11,23 +11,21 @@ import test_functions
 TOL = 1e-5
 
 
-def exchange(i, t_star, d_star, f, S, basis, knots, n, verbose=False):
-
+def exchange(i, t_star, d_star, f, approx, basis, knots, n, verbose=False):
     t_star_sign = np.sign(d_star)
 
     # Check if t* is an internal knot
     knot_index = None
-
     for j in range(1, n):
         if abs(t_star - knots[j]) <= TOL:
             knot_index = j
             t_star = knots[j]
-            # print(f"t* is an internal knot at {t_star} with sign {t_star_sign}")
             break
 
     # t* cannot be a basis point
     if any(np.any(np.isclose(b, t_star)) for b in basis):
-        print(f"EXIT 2: t*={t_star} is already a basis point in interval {i}")
+        if verbose:
+            print(f"EXIT 2: t*={t_star} is already a basis point.")
         return None
 
     # Case 1: t* is an internal knot - look in both adjacent intervals
@@ -39,8 +37,8 @@ def exchange(i, t_star, d_star, f, S, basis, knots, n, verbose=False):
         left_pt = basis[left_i][-1]
         right_pt = basis[right_i][0]
 
-        left_sign = np.sign(S.deviation(left_pt))
-        right_sign = np.sign(S.deviation(right_pt))
+        left_sign = np.sign(approx.deviation(left_pt))
+        right_sign = np.sign(approx.deviation(right_pt))
 
         # update i to the interval of the basis point that has the same sign as t*
         if left_sign == t_star_sign:
@@ -58,7 +56,6 @@ def exchange(i, t_star, d_star, f, S, basis, knots, n, verbose=False):
 
     # Case 2: t* is a normal point - look only in current interval
     else:
-
         basis_points = basis[i]
 
         left = basis_points[basis_points < t_star]
@@ -69,9 +66,11 @@ def exchange(i, t_star, d_star, f, S, basis, knots, n, verbose=False):
 
         t_tilde = None
 
-        if left_pt is not None and np.sign(S.deviation(left_pt)) == t_star_sign:
+        if left_pt is not None and np.sign(approx.deviation(left_pt)) == t_star_sign:
             t_tilde = left_pt
-        elif right_pt is not None and np.sign(S.deviation(right_pt)) == t_star_sign:
+        elif (
+            right_pt is not None and np.sign(approx.deviation(right_pt)) == t_star_sign
+        ):
             t_tilde = right_pt
 
         # For a single interval problem, allow exchange with basis point at opposite end of interval if it has same sign as t*
@@ -83,7 +82,7 @@ def exchange(i, t_star, d_star, f, S, basis, knots, n, verbose=False):
             else:
                 end_pt = None
 
-            if end_pt is not None and np.sign(S.deviation(end_pt)) == t_star_sign:
+            if end_pt is not None and np.sign(approx.deviation(end_pt)) == t_star_sign:
                 t_tilde = end_pt
 
         if t_tilde is None:
@@ -97,7 +96,7 @@ def exchange(i, t_star, d_star, f, S, basis, knots, n, verbose=False):
     basis_points = basis[i]
 
     # Get max absolute deviation at basis points in interval i
-    basis_deviations = np.array([S.deviation(t) for t in basis_points])
+    basis_deviations = np.array([approx.deviation(t) for t in basis_points])
     max_basis_deviation = np.max(np.abs(basis_deviations))
 
     # Absolute deviation at t* must be greater than the absolute deviation at any of the basis points in that interval
@@ -125,6 +124,7 @@ def gra(
     exchange_function=exchange,
     fixed_left_value=None,
     fixed_right_value=None,
+    verbose=False,
 ):
     return nadia_original.gra(
         f,
@@ -134,36 +134,25 @@ def gra(
         exchange_function=exchange_function,
         fixed_left_value=fixed_left_value,
         fixed_right_value=fixed_right_value,
+        verbose=verbose,
     )
 
 
 if __name__ == "__main__":
-    function_name = "g"
+    function_name = "f_g"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
     a, b = -1, 1
-    k = 1
-    m = 1
-    n = k + 1
+    k = 7  # number of internal fixed knots
+    m = 2  # degree of polynomial to fit in each subinterval
+    n = k + 1  # number of subintervals
 
     # Choose initial knots
-    knots = [a, 0.38, b]
-
-    print(f"Function: {function_name}")
-    print(f"Knots: {knots}")
+    knots = np.array([-1, -5 / 6, -1 / 2, -1 / 6, 0, 1 / 6, 1 / 2, 5 / 6, 1])
 
     # Pass the modified exchange function to gra
-    result = nadia_original.gra(f, knots, m, n, exchange_function=exchange)
-
-    if result["exit_type"] == 1:
-        print("EXIT 1 (spline is optimal). Chain: ", result["chain"])
-
-    print("basis:            ", result["approximation"].basis)
-    print("alternance points:", result["approximation"].alternancesequence()[0])
-
-    d_max = result["approximation"].maxdeviation()[2]
-    print(
-        f"Max abs deviation: {d_max:.5f} at t = {result['approximation'].maxdeviation()[1]:.5f}"
+    result = nadia_original.gra(
+        f, knots, m, n, exchange_function=exchange, verbose=True
     )
 
     status = "Optimal" if result["exit_type"] == 1 else "Non-optimal"
@@ -175,8 +164,7 @@ if __name__ == "__main__":
         approximation_label=rf"$S_{{{m}}}(t)$",
         title=(
             f"Degree-{m} spline approximation of {f_label}. "
-            f"{k} internal knots ({status}). "
-            f"Max abs deviation: {d_max:.5f}."
+            f"{k} internal knots ({status})."
         ),
         file_name=f"duo_mod_{function_name}_k{k}_m{m}.png",
     )
