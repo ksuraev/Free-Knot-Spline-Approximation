@@ -1,6 +1,3 @@
-from datetime import datetime
-from pathlib import Path
-
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -9,11 +6,6 @@ import nurnberger_mod
 import plotting
 import remez
 import test_functions
-
-date = datetime.now().strftime("%Y-%m-%d")
-
-plot_dir = Path("plots") / date
-plot_dir.mkdir(parents=True, exist_ok=True)
 
 
 def fixed_left_tail(f, a, theta, b, m, n):
@@ -369,8 +361,7 @@ if __name__ == "__main__":
             f"{k} internal knots ({status}). "
             f"Max abs deviation: {psi_result['d_max']:.5f}."
         ),
-        file_name=plot_dir
-        / f"{function_name}_a{a}_b{b}_knot{theta_opt:.5f}_k{k}_m{m}_psi(t){psi_result['d_max']:.5f}.png",
+        file_name=f"{function_name}_a{a}_b{b}_knot{theta_opt:.5f}_k{k}_m{m}_psi(t){psi_result['d_max']:.5f}.png",
     )
 
     # # gradient test shit

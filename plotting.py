@@ -1,5 +1,13 @@
+from datetime import datetime
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 import numpy as np
+
+date = datetime.now().strftime("%Y-%m-%d")
+
+plot_dir = Path("plots") / date
+plot_dir.mkdir(parents=True, exist_ok=True)
 
 FUNCTION_COLOR = "slategray"
 APPROXIMATION_COLOR = "cornflowerblue"
@@ -200,7 +208,7 @@ def plot_detailed(
     fig.tight_layout()
 
     if file_name is not None:
-        fig.savefig(file_name)
+        fig.savefig(plot_dir / file_name, dpi=300, bbox_inches="tight")
 
     plt.show()
 
@@ -255,6 +263,6 @@ def plot_report(
     fig.tight_layout()
 
     if file_name is not None:
-        fig.savefig(file_name, dpi=300, bbox_inches="tight")
+        fig.savefig(plot_dir / file_name, dpi=300, bbox_inches="tight")
 
     plt.show()
