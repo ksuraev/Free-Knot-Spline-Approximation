@@ -117,7 +117,7 @@ if __name__ == "__main__":
 
     print(f"Max deviation: {abs(d_star)}")
     print(f"knots: {approx.g.knots}")
-    print(f"basiss: {approx.basis}")
+    print(f"basis: {approx.basis}")
 
     plotting.plot_duo(
         approx,
@@ -125,6 +125,6 @@ if __name__ == "__main__":
         f_label=f_label,
         approximation_label="Piecewise polynomial approximation",
         points_label="Alternance points",
-        title=f"Degree-{degree} approximation with {len(approx.g.knots) - 2} free knots. Max abs deviation: {abs(d_star):.5f}.",
+        title=f"Degree-{degree} approximation with {len(approx.g.knots) - 2} free knots.",
         file_name=f"nberger_{function_name}_a{a}_b{b}_k{k}_m{degree}.png",
     )
