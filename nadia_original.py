@@ -27,17 +27,34 @@ def step_zero(knots, m, n, fixed_left_tail=False, fixed_right_tail=False):
     return basis
 
 
+# d is degree of polynomial in each subinterval
+# we were doing 'for d in range(1, m + 1) for knot in knots' so we got t0^1 t1^1 t2^1 ... t^2 t1^2 t2^2 ... etc
+# but we want t0^1 t0^2 t0^3 ... t1^1 t1^2 t1^3 ..so we need to swap the order of the loops?
 def build_P(basis, knots, m):
     return np.array(
         [
             [
-                np.maximum(0, t - knot) ** beta
-                for beta in range(1, m + 1)
+                np.maximum(0, t - knot) ** d
                 for knot in knots[0:-1]
+                for d in range(1, m + 1)
             ]
             for t in basis
         ]
     )
+
+
+def build_simplex_system(f, samples, knots, m):
+    P = build_P(samples, knots, m)
+    M = np.concatenate([np.ones((len(samples), 1)), P], axis=1)
+
+    # Stack M and -M vertically
+    A = np.concatenate([M, -M], axis=0)
+
+    # add column of ones
+    A = np.concatenate([A, -np.ones((2 * len(samples), 1))], axis=1)
+
+    b = np.concatenate([f(samples), -f(samples)], axis=0)
+    return A, b
 
 
 def build_gradients(basis, S, signs):
@@ -114,7 +131,6 @@ def step_one(knots, basis, m, n, f, fixed_left_value=None, fixed_right_value=Non
     # Extract coefficients and delta
     a0 = solution[0]
     a = solution[1:-1].reshape(n, m)
-    delta = solution[-1]
 
     # Construct spline S from the coefficients
     coeffs = [np.concatenate([[0], c]) for c in a]
@@ -122,7 +138,7 @@ def step_one(knots, basis, m, n, f, fixed_left_value=None, fixed_right_value=Non
     polynomials = [Spline.Polynomial(c, offset=x) for c, x in zip(coeffs, knots[:-1])]
     S = Spline.SUSpline(knots, polynomials)
 
-    return S, delta, a0, a  # remove a0, a
+    return S
 
 
 def exchange(i, t_star, d_star, f, approx, basis, knots, n, verbose=False):
@@ -183,7 +199,6 @@ def exchange(i, t_star, d_star, f, approx, basis, knots, n, verbose=False):
 
 # Tarashnin's necessary and sufficient optimality conditions (EXIT 1)
 def check_exit_1(
-    f,
     approx,
     knots,
     n,
@@ -305,9 +320,7 @@ def gra(
 
     # Form initial basis and compute initial spline approx
     basis = step_zero(knots, m, n, fixed_left_tail, fixed_right_tail)
-    S, delta, a0, a = step_one(
-        knots, basis, m, n, f, fixed_left_value, fixed_right_value
-    )
+    S = step_one(knots, basis, m, n, f, fixed_left_value, fixed_right_value)
     approx = Spline.Approximation(f, S, (knots[0], knots[-1]), basis=basis)
 
     optimal = False
@@ -318,7 +331,6 @@ def gra(
         i_star, t_star, d_star = approx.maxdeviation()
 
         optimal, pts, signs, chain = check_exit_1(
-            f,
             approx,
             knots,
             n,
@@ -346,19 +358,21 @@ def gra(
 
         # Update basis and recompute spline approximation
         basis = new_basis
-        S, delta, a0, a = step_one(
-            knots, basis, m, n, f, fixed_left_value, fixed_right_value
-        )
+        S = step_one(knots, basis, m, n, f, fixed_left_value, fixed_right_value)
         approx = Spline.Approximation(f, S, (knots[0], knots[-1]), basis=basis)
 
     # Final maximum absolute deviation
     i_star, t_star, d_star = approx.maxdeviation()
-    A = Spline.Approximation(f, S, [knots[0], knots[-1]], basis)
+    approx = Spline.Approximation(f, S, [knots[0], knots[-1]], basis)
+
+    if verbose:
+        if exit_type == 1:
+            print(f"EXIT 1: Spline is optimal. Chain: {chain}")
+        print(f"Final max abs deviation: {abs(d_star):.5f} at t*={t_star:.5f}")
+        print(f"Final basis: {approx.basis}")
 
     return {
-        "approximation": A,
-        "delta": delta,
-        "optimal": optimal,
+        "approximation": approx,
         "exit_type": exit_type,
         "chain": chain,
         "exit_i_star": exit_i_star,
@@ -372,26 +386,28 @@ if __name__ == "__main__":
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
     a, b = -1, 1
-    k = 1  # number of internal fixed knots
+    k = 7  # number of internal fixed knots
     m = 1  # degree of polynomial to fit in each subinterval
     n = k + 1  # number of subintervals
 
     # Choose initial knots
-    knots = [a, 0.38, b]
-
-    result = gra(f, knots, m, n, exchange_function=exchange, verbose=True)
-    if result["exit_type"] == 1:
-        print("EXIT 1 (spline is optimal). Chain: ", result["chain"])
-
-    print("basis:            ", result["approximation"].basis)
-    print("alternance points:", result["approximation"].alternancesequence()[0])
-
-    d_max = result["approximation"].maxdeviation()[2]
-    print(
-        f"Max abs deviation: {d_max:.5f} at t = {result['approximation'].maxdeviation()[1]:.5f}"
+    knots = np.array(
+        [
+            -1,
+            -5 / 6,
+            -1 / 2,
+            -1 / 6,
+            0,
+            1 / 6,
+            1 / 2,
+            5 / 6,
+            1,
+        ]
     )
 
-    status = "Optimal" if result["optimal"] else "Not optimal"
+    result = gra(f, knots, m, n, exchange_function=exchange, verbose=True)
+
+    status = "Optimal" if result["exit_type"] == 1 else "Not optimal"
 
     plotting.plot_duo(
         result["approximation"],
@@ -401,7 +417,6 @@ if __name__ == "__main__":
         title=(
             f"Degree-{m} spline approximation of {f_label}. "
             f"{k} internal knots ({status}). "
-            f"Max abs deviation: {d_max:.5f}."
         ),
         file_name=f"duo_orig_{function_name}_k{k}_m{m}.png",
     )
