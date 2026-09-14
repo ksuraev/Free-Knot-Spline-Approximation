@@ -5,23 +5,24 @@ import Spline
 import test_functions
 
 CONVERGENCE_TOL = 1e-14
+DEVIATION_TOL = 1e-6
 
 
-def calculate_polynomial(f, xn, n):
+def calculate_polynomial(f, basis, m):
     # Initialise matrix A and vector b
-    A = np.zeros((n + 2, n + 2))
-    b = np.zeros(n + 2)
+    A = np.zeros((m + 2, m + 2))
+    b = np.zeros(m + 2)
 
     # Populate A and b
-    for i in range(n + 2):
-        x = xn[i]
+    for i in range(m + 2):
+        x = basis[i]
 
-        # Fill the polynomial terms 1, x, x^2, ..., x^n
-        for j in range(n + 1):
+        # Fill the polynomial terms 1, x, x^2, ..., x^m
+        for j in range(m + 1):
             A[i, j] = x**j
 
-        # Fill last column with the alternating error term (-1)^i
-        A[i, n + 1] = (-1) ** i
+        # Fill last column with the alternating deviation term (-1)^i
+        A[i, m + 1] = (-1) ** i
 
         # Fill vector b with function values
         b[i] = f(x)
@@ -29,7 +30,7 @@ def calculate_polynomial(f, xn, n):
     # Solve the system Ax = b
     solution = np.linalg.solve(A, b)
 
-    # Extract coefficients (first n+1 elements) and error (last element)
+    # Extract coefficients (first m+1 elements) and deviation (last element)
     coeffs = solution[:-1]
     E = solution[-1]
 
@@ -39,63 +40,71 @@ def calculate_polynomial(f, xn, n):
     return P, E
 
 
-def exchange(xn, x_new, d_max, errors):
+def exchange(basis, x_new, d_max, errors):
     # If the new point is outside the leftmost point
-    if x_new < xn[0]:
+    if x_new < basis[0]:
         if np.sign(d_max) == np.sign(errors[0]):
             # replace the leftmost point
-            xn[0] = x_new
+            basis[0] = x_new
         else:
             # add x_new to the left and drop rightmost point
-            xn = np.insert(xn, 0, x_new)[:-1]
+            basis = np.insert(basis, 0, x_new)[:-1]
 
     # If the new point is outside the rightmost point
-    elif x_new > xn[-1]:
+    elif x_new > basis[-1]:
         if np.sign(d_max) == np.sign(errors[-1]):
             # replace the rightmost point
-            xn[-1] = x_new
+            basis[-1] = x_new
         else:
             # add x_new to the right and drop leftmost point
-            xn = np.append(xn[1:], x_new)
+            basis = np.append(basis[1:], x_new)
 
     # If the new point is between two existing points
     else:
-        for i in range(len(xn) - 1):
-            if xn[i] < x_new < xn[i + 1]:
+        for i in range(len(basis) - 1):
+            if basis[i] < x_new < basis[i + 1]:
 
                 # Replace with the closest point with same sign
                 if np.sign(d_max) == np.sign(errors[i]):
-                    xn[i] = x_new
+                    basis[i] = x_new
                 else:
-                    xn[i + 1] = x_new
-    return xn
+                    basis[i + 1] = x_new
+    return basis
 
 
-def remez(f, a, b, n, tol=1e-6, max_iter=10000):
-    # Guess initial n+2 points equidistantly spaced in the interval [a, b]
-    xn = np.linspace(a, b, n + 2)
+def remez(f, a, b, m, max_iter=10000, verbose=False):
+    # Guess initial m+2 points equidistantly spaced in the interval [a, b]
+    basis = np.linspace(a, b, m + 2)
 
     for i in range(max_iter):
-        P, E = calculate_polynomial(f, xn, n)
-        approx = Spline.Approximation(f, P, [a, b], xn)
+        P, E = calculate_polynomial(f, basis, m)
+        approx = Spline.Approximation(f, P, [a, b], basis)
 
         # Find maximum absolute deviation over [a, b]
         _, x_max, d_max = approx.maxdeviation()
-        approx._max_deviation = (0, x_max, d_max)
 
         # Check for convergence - Trefethen paper
         if abs(E) < CONVERGENCE_TOL:
             converged = abs(d_max) < CONVERGENCE_TOL
         else:
-            converged = abs(d_max) - abs(E) <= tol * abs(E)
+            converged = abs(d_max) - abs(E) <= DEVIATION_TOL * abs(E)
         if converged:
+            if verbose:
+                print(f"Final max abs deviation: {abs(d_max):.5f} at t*={x_max:.5f}")
+                print(f"Final basis: {approx.basis}")
             return approx
 
-        # Update the references points using single point exchange
-        errors = f(xn) - P(xn)
-        xn = exchange(xn, x_max, d_max, errors)
+        # Update the basis points using VP exchange
+        basis_dev = f(basis) - P(basis)
+        basis = exchange(basis, x_max, d_max, basis_dev)
 
-    # approx = Spline.Approximation(f, P, [a, b], xn)
+    approx = Spline.Approximation(f, P, [a, b], basis)
+
+    if verbose:
+        _, t_star, d_star = approx.maxdeviation()
+        print(f"Final max abs deviation: {abs(d_star):.5f} at t*={t_star:.5f}")
+        print(f"Final basis: {approx.basis}")
+
     return approx
 
 
@@ -107,9 +116,6 @@ if __name__ == "__main__":
     m = 10
 
     approx = remez(f, a, b, m)
-
-    print(f"Max abs deviation: {approx.maxdeviation()[2]:.5f}")
-    print(f"Alternance points: {approx.basis}")
 
     plotting.plot_report(
         approx,
