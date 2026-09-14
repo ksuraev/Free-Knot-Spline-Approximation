@@ -1,6 +1,5 @@
 import numpy as np
 
-import helper
 import plotting
 import Spline
 import test_functions
@@ -78,11 +77,11 @@ def remez(f, a, b, n, tol=1e-6, max_iter=10000):
 
     for i in range(max_iter):
         P, E = calculate_polynomial(f, xn, n)
+        approx = Spline.Approximation(f, P, [a, b], xn)
 
         # Find maximum absolute deviation over [a, b]
-        _, _, (_, x_max, d_max) = helper.find_extrema_overall(
-            lambda i, t: f(t) - P(t), [a, b]
-        )
+        _, x_max, d_max = approx.maxdeviation()
+        approx._max_deviation = (0, x_max, d_max)
 
         # Check for convergence - Trefethen paper
         if abs(E) < CONVERGENCE_TOL:
@@ -90,16 +89,14 @@ def remez(f, a, b, n, tol=1e-6, max_iter=10000):
         else:
             converged = abs(d_max) - abs(E) <= tol * abs(E)
         if converged:
-            return P, d_max, xn
+            return approx
 
         # Update the references points using single point exchange
         errors = f(xn) - P(xn)
         xn = exchange(xn, x_max, d_max, errors)
 
-    approx = Spline.Approximation(f, P, [a, b], xn)
+    # approx = Spline.Approximation(f, P, [a, b], xn)
     return approx
-
-    # return P, e_max, xn
 
 
 if __name__ == "__main__":
@@ -108,19 +105,17 @@ if __name__ == "__main__":
 
     a, b = -1, 1
     m = 10
-    P, d_max, alt_pts = remez(f, a, b, m)
 
-    print(f"Max abs deviation: {d_max}")
-    print(f"Alternance points: {alt_pts}")
+    approx = remez(f, a, b, m)
+
+    print(f"Max abs deviation: {approx.maxdeviation()[2]:.5f}")
+    print(f"Alternance points: {approx.basis}")
 
     plotting.plot_report(
-        f,
-        P,
-        a,
-        b,
-        knots=None,
-        points=alt_pts,
+        approx,
+        points=approx.basis,
         f_label=f_label,
         approximation_label=rf"$P_{{{m}}}(t)$",
-        file_name=f"remez_report_{function_name}_a{a}_b{b}_m{m}_report.png",
+        points_label="",
+        file_name=f"remez_report_{function_name}_m{m}.png",
     )

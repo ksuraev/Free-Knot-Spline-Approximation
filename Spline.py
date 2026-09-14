@@ -1,6 +1,6 @@
+import matplotlib.pyplot as plt
 import numpy as np
 from scipy.special import factorial
-import matplotlib.pyplot as plt
 
 
 class Polynomial(np.polynomial.Polynomial):
@@ -12,12 +12,7 @@ class Polynomial(np.polynomial.Polynomial):
     This class derives from the numpy polynomial class.
     """
 
-    def __init__(self,
-                 coefficients,
-                 domain=None,
-                 window=None,
-                 symbol="t",
-                 offset=0):
+    def __init__(self, coefficients, domain=None, window=None, symbol="t", offset=0):
         super().__init__(coefficients, domain, window, symbol)
         self.offset = offset
 
@@ -34,14 +29,9 @@ class Polynomial(np.polynomial.Polynomial):
     def rebase(self, theta=0):
         """Return the same polynomial, but with a different basis of `t-θ`."""
         coefs = [
-            1 / factorial(i) * self.deriv(i)(theta)
-            for i in range(self.degree() + 1)
+            1 / factorial(i) * self.deriv(i)(theta) for i in range(self.degree() + 1)
         ]
-        return Polynomial(coefs,
-                          self.domain,
-                          self.window,
-                          self.symbol,
-                          offset=theta)
+        return Polynomial(coefs, self.domain, self.window, self.symbol, offset=theta)
 
     def deriv(self, m=1):
         return super().deriv(m=m).addoffset(self.offset)
@@ -49,11 +39,9 @@ class Polynomial(np.polynomial.Polynomial):
     def __str__(self):
         string = super().__str__()
         if self.offset > 0:
-            string = string.replace(self.symbol,
-                                    f"({self.symbol} - {self.offset})")
+            string = string.replace(self.symbol, f"({self.symbol} - {self.offset})")
         if self.offset < 0:
-            string = string.replace(self.symbol,
-                                    f"({self.symbol} + {-self.offset})")
+            string = string.replace(self.symbol, f"({self.symbol} + {-self.offset})")
         return string
 
     @classmethod
@@ -78,8 +66,7 @@ class Spline:
 
         self.knots = knots
         self.polynomials = np.array(
-            [v if isinstance(v, Polynomial) else Polynomial(v)
-             for v in polynomials]
+            [v if isinstance(v, Polynomial) else Polynomial(v) for v in polynomials]
         )
 
         # We work out the degree of the spline from the degrees
@@ -97,9 +84,16 @@ class Spline:
     def __call__(self, t):
         """Evaluate the spline at point t"""
 
-        assert (t >= self.knots[0]) and (
+        assert np.all(t >= self.knots[0]) and np.all(
             t <= self.knots[-1]
         ), "Value outside of Spline interval."
+
+        if isinstance(t, np.ndarray):
+            results = np.zeros(t.shape)
+            for i, p in enumerate(self.polynomials):
+                mask = (t >= self.knots[i]) & (t < self.knots[i + 1])
+                results[mask] += p(t[mask])
+            return results
 
         # Find the subinterval containing `t`.
         k = np.where(self.knots[:-1] <= t)[0][-1]
@@ -115,8 +109,7 @@ class Spline:
     def concatenate(this, S):
         """Concatenate two splines"""
 
-        assert this.knots[-1] == S.knots[0], (
-                "The splines' intervals are not adjacent.")
+        assert this.knots[-1] == S.knots[0], "The splines' intervals are not adjacent."
 
         return Spline(
             np.concatenate([this.knots, S.knots[1:]]),
@@ -124,8 +117,16 @@ class Spline:
         )
 
     def __str__(self):
-        return "\n".join([f"[{self.knots[i]}, {self.knots[i+1]}): \
-                         {p}" for i, p in enumerate(self.polynomials)]) + '\n'
+        return (
+            "\n".join(
+                [
+                    f"[{self.knots[i]}, {self.knots[i+1]}): \
+                         {p}"
+                    for i, p in enumerate(self.polynomials)
+                ]
+            )
+            + "\n"
+        )
 
     # This should ideally return an Approximation object.
     @classmethod
@@ -135,8 +136,9 @@ class Spline:
 
     def to_SSpline(self):
         """Convert a spline to the format used in Sukhorukova, 2010."""
-        polynomials = [p.rebase(theta)
-                       for p, theta in zip(self.polynomials, self.knots)]
+        polynomials = [
+            p.rebase(theta) for p, theta in zip(self.polynomials, self.knots)
+        ]
         return Spline(self.knots, polynomials)
 
     def to_SUSpline(self):
@@ -144,8 +146,7 @@ class Spline:
         cumulative = [self.polynomials[0]] + list(
             self.polynomials[1:] - self.polynomials[:-1]
         )
-        polynomials = [p.rebase(theta)
-                       for p, theta in zip(cumulative, self.knots)]
+        polynomials = [p.rebase(theta) for p, theta in zip(cumulative, self.knots)]
         return SUSpline(self.knots, polynomials)
 
     def rebase(self, theta=0):
@@ -160,9 +161,16 @@ class SUSpline(Spline):
     def __call__(self, t):
         """Evaluate the spline at point `t`."""
 
-        assert (t >= self.knots[0]) and (
+        assert np.all(t >= self.knots[0]) and np.all(
             t <= self.knots[-1]
         ), "Value outside of Spline interval."
+
+        if isinstance(t, np.ndarray):
+            results = np.zeros(t.shape)
+            for p in self.polynomials:
+                mask = t >= p.offset
+                results[mask] += p(t[mask])
+            return results
 
         return sum(p(t) for p in self.polynomials if t >= p.offset)
 
@@ -170,74 +178,140 @@ class SUSpline(Spline):
 # We can get our algorithms to return an object of this type
 # with appropriately picked parameters.
 class Approximation:
-    """An approximation function."""
+    """An approximation of f by g."""
 
-    def __init__(self, f, g, interval, basis=None):
+    def __init__(self, f, g, interval, basis=None, max_deviation=None):
         self.f = f
         self.g = g
         self.interval = interval
         self.basis = basis
+        self.max_deviation = max_deviation
 
     def deviation(self, t):
-        """The absolute deviation achieved at point `t`"""
-        return abs(self.f(t) - self.g(t))
+        """Return the signed deviation f(t) - g(t)."""
+        return self.f(t) - self.g(t)
 
-    def maxdeviation(self):
-        """The maximum absolute deviation achieved across the interval."""
-        sample = np.linspace(self.interval[0], self.interval[1], 10000)
-        return max([self.deviation(t) for t in sample])
+    def _extrema(self, n_samples=10000):
+        """Return local maxima of absolute deviation as (i, t, d)."""
 
-    # This should be improved. Right now this likely has subsequent samples,
-    # We should build a mechanism to only report one point if, several
-    # subsequent points achieve the max deviation.
-    def maxdeviationpoints(self, tol=1e-6):
-        """The points where the maximum deviation is achieved"""
-        maxdev = self.maxdev()
-        sample = np.linspace(self.interval[0], self.interval[1], 10000)
-        return [t for t in sample if self.deviation(t) >= maxdev - tol]
+        knots = self.g.knots if hasattr(self.g, "knots") else self.interval
+        extrema = []
 
-    def alternancesequence(self, tol=1e-6):
-        """Give the largest alternance sequence in the interval."""
-        assert False, "Not Implemented."
+        for i in range(len(knots) - 1):
+            t = np.linspace(knots[i], knots[i + 1], n_samples)
+
+            if i > 0:
+                t = t[1:]
+
+            d = self.deviation(t)
+            abs_d = np.abs(d)
+
+            indices = []
+
+            if abs_d[0] >= abs_d[1]:
+                indices.append(0)
+
+            indices.extend(
+                j
+                for j in range(1, len(t) - 1)
+                if abs_d[j] >= abs_d[j - 1] and abs_d[j] >= abs_d[j + 1]
+            )
+
+            if abs_d[-1] >= abs_d[-2]:
+                indices.append(len(t) - 1)
+
+            extrema.extend((i, t[j], d[j]) for j in indices)
+
+        return extrema
+
+    def maxdeviation(self, n_samples=10000):
+        if self.max_deviation is not None:
+            return self.max_deviation
+
+        extrema = self._extrema(n_samples)
+
+        self.max_deviation = max(
+            extrema,
+            key=lambda x: abs(x[2]),
+        )
+
+        return self.max_deviation
+
+    def maxdeviationpoints(self, tol=1e-5, n_samples=10000):
+        """Return all points attaining the maximum absolute deviation."""
+
+        extrema = self._extrema(n_samples)
+
+        if not extrema:
+            return []
+
+        global_max = max(abs(d) for _, _, d in extrema)
+
+        return [(t, d) for _, t, d in extrema if abs(abs(d) - global_max) <= tol]
+
+    def alternancesequence(self, tol=1e-5, n_samples=10000):
+        """Return largest sequence of alternance points, with their signs."""
+        points = self.maxdeviationpoints(tol=tol, n_samples=n_samples)
+
+        unique = []
+
+        for t, d in points:
+            if not unique or not np.isclose(t, unique[-1][0]):
+                unique.append((t, d))
+
+        pts = np.array([t for t, _ in unique])
+        signs = np.array([np.sign(d) for _, d in unique])
+
+        return pts, signs
 
     def plot_functions(self, plot_title, plot_name):
-
         fig, ax = plt.subplots(figsize=(10, 6))
 
-        # original function f(x)
         x = np.linspace(self.interval[0], self.interval[1], 1000)
+
+        # Original function
         ax.plot(x, self.f(x), color="slategray", label="f(x)")
 
-        # approximation polynomial P(x)
-        ax.plot(x, self.g(x), color="dodgerblue", label="P(x)")
-
-        # alternance points
-        for x in self.basis:
-            ax.axvline(x=x, color="lightgray", linestyle="--", alpha=0.5)
+        # Approximation
+        y = [self.g(t) for t in x]
+        ax.plot(x, y, color="dodgerblue", label="Approximation")
 
         ax.set_title(plot_title)
         ax.legend(loc="best")
+
         fig.tight_layout()
         fig.savefig(plot_name)
+
         plt.show()
 
     def plot_deviation(self, plot_title, plot_name):
-
         fig, ax = plt.subplots(figsize=(10, 6))
 
-        # original function f(x)
         x = np.linspace(self.interval[0], self.interval[1], 1000)
-        ax.plot(x, self.deviation(x), color="slategray", label="|f(x)-P(x)|")
 
-        # alternance points
-        for x in self.basis:
-            ax.axvline(x=x, color="lightgray", linestyle="--", alpha=0.5)
+        # Signed deviation
+        d = [self.deviation(t) for t in x]
+        ax.plot(x, d, color="slategray", label="f(x) - g(x)")
 
-        for x in self.alternancesequence():
-            ax.axvline(x=x, color="red", linestyle=":", alpha=0.5)
+        # Basis points
+        if self.basis is not None:
+            basis = np.concatenate(
+                [np.atleast_1d(points) for points in np.atleast_1d(self.basis)]
+            )
+
+            for point in basis:
+                ax.axvline(x=point, color="lightgray", linestyle="--", alpha=0.5)
+
+        # Alternance points
+        alt_points, _ = self.alternancesequence()
+
+        for point in alt_points:
+            ax.axvline(x=point, color="red", linestyle=":", alpha=0.5)
 
         ax.set_title(plot_title)
         ax.legend(loc="best")
+
         fig.tight_layout()
         fig.savefig(plot_name)
+
         plt.show()
