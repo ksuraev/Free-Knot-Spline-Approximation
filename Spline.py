@@ -97,9 +97,16 @@ class Spline:
     def __call__(self, t):
         """Evaluate the spline at point t"""
 
-        assert (t >= self.knots[0]) and (
+        assert np.all(t >= self.knots[0]) and np.all(
             t <= self.knots[-1]
         ), "Value outside of Spline interval."
+
+        if isinstance(t, np.ndarray):
+            results = np.zeros(t.shape)
+            for i, p in enumerate(self.polynomials):
+                mask = (t >= self.knots[i]) & (t < self.knots[i+1])
+                results[mask] += p(t[mask])
+            return results
 
         # Find the subinterval containing `t`.
         k = np.where(self.knots[:-1] <= t)[0][-1]
@@ -160,9 +167,16 @@ class SUSpline(Spline):
     def __call__(self, t):
         """Evaluate the spline at point `t`."""
 
-        assert (t >= self.knots[0]) and (
+        assert np.all(t >= self.knots[0]) and np.all(
             t <= self.knots[-1]
         ), "Value outside of Spline interval."
+
+        if isinstance(t, np.ndarray):
+            results = np.zeros(t.shape)
+            for p in self.polynomials:
+                mask = t >= p.offset
+                results[mask] += p(t[mask])
+            return results
 
         return sum(p(t) for p in self.polynomials if t >= p.offset)
 

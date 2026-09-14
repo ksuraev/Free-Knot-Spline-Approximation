@@ -72,6 +72,7 @@ def test_SUSpline_from_Spline():
     assert S1(1.) == S2(1.)
     return S2
 
+
 def test_SSpline_from_Spline():
     S1, _ = create_Spline_from_polynomial()
     S2 = S1.to_SSpline()
@@ -83,6 +84,7 @@ def test_SSpline_from_Spline():
     assert S1(0.75) == S2(0.75)
     assert S1(1.) == S2(1.)
     return S2
+
 
 def test_Spline_rebase():
     S1, _ = create_Spline_from_polynomial()
@@ -97,6 +99,13 @@ def test_Spline_rebase():
     return S2
 
 
+def test_Spline_evaluation_over_array():
+    S, _ = create_Spline_from_polynomial() 
+    S2 = S.to_SUSpline()
+    x = np.array([-0.5, -0.25, 0., 0.25, 0.5])
+    assert np.all(S2(x) == S(x))
+
+
 if __name__ == "__main__":
     p = test_polynomial()
     test_Spline_from_polynomials()
@@ -105,3 +114,4 @@ if __name__ == "__main__":
     S2 = test_SUSpline_from_Spline()
     S3 = test_SSpline_from_Spline()
     S4 = test_Spline_rebase()
+    test_Spline_evaluation_over_array()
