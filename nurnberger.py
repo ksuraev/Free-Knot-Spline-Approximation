@@ -3,13 +3,18 @@ import numpy as np
 
 import plotting
 import remez
+import Spline
 import test_functions
+
+TOL = 1e-5
 
 
 def d(f, a, b, degree):
-    """Compute the maximum deviation over the interval [a,b] using the Remez algorithm. Returns the maximum deviation and the alternance points."""
-    _, d_max, alt_pts = remez.remez(f, a, b, degree)
-    return abs(d_max), alt_pts
+    """Return the maximum absolute deviation and Remez approximation on [a, b]."""
+    approx = remez.remez(f, a, b, degree)
+    _, _, d_max = approx.maxdeviation()
+
+    return abs(d_max), approx
 
 
 def step_zero(f, a, b, k, degree):
@@ -31,6 +36,9 @@ def run(f, a, b, k, degree, tolerance=1e-6, max_iter=100):
     """Run the Nurnberger algorithm to find the optimal placement of k free knots in the interval [a,b] for polynomial approximation of degree 'degree'."""
     knots, d_min, d_max = step_zero(f, a, b, k, degree)
 
+    # Track the approximations for each subinterval
+    approximations = None
+
     for iteration in range(max_iter):
         if abs(d_max - d_min) < tolerance * d_max:
             break
@@ -39,11 +47,11 @@ def run(f, a, b, k, degree, tolerance=1e-6, max_iter=100):
         d_n = (d_min * d_max) ** 0.5
 
         new_knots = [a]
+        new_approximations = []
         x_i = a
-        j = 0
 
         # Subroutine: solve d(x_i, x_bar) = d_n while knots can be placed
-        for _ in range(k):
+        for z in range(k):
             d_i, _ = d(f, x_i, b, degree)
             if d_i <= d_n:
                 break
@@ -54,9 +62,9 @@ def run(f, a, b, k, degree, tolerance=1e-6, max_iter=100):
 
             for _ in range(max_iter):
                 x_bar = (x_l + x_u) / 2
-                d_i_max, alt_pts = d(f, x_i, x_bar, degree)
+                d_i_max, approx_i = d(f, x_i, x_bar, degree)
 
-                if abs(d_i_max - d_n) < 1e-10 * d_n:
+                if abs(d_i_max - d_n) < TOL * d_n:
                     break
                 elif d_i_max < d_n:
                     x_l = x_bar
@@ -64,66 +72,59 @@ def run(f, a, b, k, degree, tolerance=1e-6, max_iter=100):
                     x_u = x_bar
 
             new_knots.append(x_bar)
+            new_approximations.append(approx_i)
             x_i = x_bar
 
-            j += 1
+        # Final real interval
+        c_n, final_approx = d(f, x_i, b, degree)
 
-        # Collapse any unplaced knots to the right endpoint b
-        remaining = k - j
-        new_knots.extend([b] * remaining)
         new_knots.append(b)
-        knots = np.array(new_knots)
+        new_approximations.append(final_approx)
 
-        # c_n = deviation of the last real interval
-        c_n, _ = d(f, knots[j], knots[j + 1], degree)
+        knots = np.array(new_knots)
+        approximations = new_approximations
 
         # Update d_min and d_max for the next iteration
         d_min = max(d_min, min(c_n, d_n))
         d_max = min(d_max, max(c_n, d_n))
 
-    return knots, d_min, d_max
+    # If convergence happened before any new approximations were built
+    if approximations is None:
+        approximations = [
+            remez.remez(f, knots[i], knots[i + 1], degree)
+            for i in range(len(knots) - 1)
+        ]
+
+    S = Spline.Spline(knots, [approx.g for approx in approximations])
+
+    basis = [approx.basis for approx in approximations]
+
+    return Spline.Approximation(f, S, (a, b), basis=basis)
 
 
 if __name__ == "__main__":
     function_name = "g"
+
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
     a, b = -1, 1
-    k = 1  # number of free knots (not including a and b)
-    degree = 1  # degree of polynomial to fit
+    k = 1
+    degree = 1
 
-    knots, d_min, d_max = run(f, a, b, k, degree)
+    approx = run(f, a, b, k, degree)
 
-    polynomials = []
-    alt_pts = []
+    _, t_star, d_star = approx.maxdeviation()
 
-    for i in range(len(knots) - 1):
-        P, _, alt = remez.remez(
-            f,
-            knots[i],
-            knots[i + 1],
-            degree,
-        )
-        polynomials.append(P)
-        alt_pts.extend(alt)
+    print(f"Max deviation: {abs(d_star)}")
+    print(f"knots: {approx.g.knots}")
+    print(f"basiss: {approx.basis}")
 
-    print(f"Max deviation: {d_max}")
-    print(f"knots: {knots}")
-    print(f"Alternance points: {alt_pts}")
-
-    def S(i, t):
-        return polynomials[i](t)
-
-    plotting.plot_detailed(
-        f,
-        S,
-        a,
-        b,
-        knots=knots,
-        points=alt_pts,
+    plotting.plot_duo(
+        approx,
+        points=approx.basis,
         f_label=f_label,
         approximation_label="Piecewise polynomial approximation",
         points_label="Alternance points",
-        title=f"Degree-{degree} approximation with {len(knots) - 2} free knots. Max abs deviation: {d_max:.5f}.",
-        file_name=f"nurnberger_{function_name}_a{a}_b{b}_k{k}_m{degree}.png",
+        title=f"Degree-{degree} approximation with {len(approx.g.knots) - 2} free knots. Max abs deviation: {abs(d_star):.5f}.",
+        file_name=f"nberger_{function_name}_a{a}_b{b}_k{k}_m{degree}.png",
     )
