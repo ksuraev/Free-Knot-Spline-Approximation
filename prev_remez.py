@@ -2,7 +2,6 @@ import numpy as np
 
 import helper
 import plotting
-import Spline
 import test_functions
 
 CONVERGENCE_TOL = 1e-14
@@ -35,7 +34,7 @@ def calculate_polynomial(f, xn, n):
     E = solution[-1]
 
     # Create polynomial function from coefficients
-    P = Spline.Polynomial(coeffs)
+    P = np.polynomial.Polynomial(coeffs)
 
     return P, E
 
@@ -96,10 +95,7 @@ def remez(f, a, b, n, tol=1e-6, max_iter=10000):
         errors = f(xn) - P(xn)
         xn = exchange(xn, x_max, d_max, errors)
 
-    approx = Spline.Approximation(f, P, [a, b], xn)
-    return approx
-
-    # return P, e_max, xn
+    return P, d_max, xn
 
 
 if __name__ == "__main__":
