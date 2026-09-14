@@ -4,6 +4,7 @@ import numpy as np
 
 import helper
 import plotting
+import Spline
 import test_functions
 
 TOL = 1e-5
@@ -38,6 +39,29 @@ def build_P(basis, knots, m):
             for t in basis
         ]
     )
+
+
+def build_gradients(basis, S, signs):
+    P = build_P(basis, S.knots, S.degree)
+    P = np.transpose(P)
+
+    M = np.zeros((len(S.knots) - 2, P.shape[1]))
+
+    for i, knot in enumerate(S.knots[1:-1]):
+        col = 0
+        for b in basis:
+            for t in b:
+                if t > knot:
+                    M[i, col] = sum(
+                        -(j + 1) * a[i, j] * (t - knot) ** j for j in range(m)
+                    )
+
+                col += 1
+
+    G = np.concatenate([np.ones((1, P.shape[1])), P, M], axis=0)
+    G = np.multiply(G, signs)
+
+    return G
 
 
 # Step 1: Solve the linear system to find the spline coefficients and delta
@@ -93,44 +117,45 @@ def step_one(knots, basis, m, n, f, fixed_left_value=None, fixed_right_value=Non
     a = solution[1:-1].reshape(n, m)
     delta = solution[-1]
 
-    # Spline function
-    def S(i, t):
-        return a0 + sum(
-            a[k, j] * np.maximum(0, t - knot) ** (j + 1)
-            for j in range(m)
-            for k, knot in enumerate(knots[0:-1])
-        )
+    # Construct spline S from the coefficients
+    coeffs = [np.concatenate([[0], c]) for c in a]
+    coeffs[0][0] = a0
+    polynomials = [Spline.Polynomial(c, offset=x) for c, x in zip(coeffs, knots[:-1])]
+    S = Spline.SUSpline(knots, polynomials)
 
-    return S, delta, a0, a
+    return S, delta, a0, a  # remove a0, a
 
 
 # Compute the deviation between f and spline S at point t
-def deviation(f, S, i, t):
-    return f(t) - S(i, t)
+# def deviation(f, S, i, t):
+#     return f(t) - S(t)
 
 
-def exchange(i, t_star, d_star, f, S, basis, knots, n):
+def exchange(i, t_star, d_star, f, approx, basis, knots, n, verbose=False):
     """VP basis exchange function. Returns new basis if exchange is possible, otherwise returns None."""
     # t* cannot be an internal knot
     for j in range(1, n):
         if abs(t_star - knots[j]) <= TOL:
-            print(f"t*={t_star} is internal knot {knots[j]}")
+            if verbose:
+                print(f"EXIT 2: t*={t_star} is internal knot {knots[j]}")
             return None
 
     basis_points = basis[i]
 
     # t* cannot be a basis point
     if np.any(np.isclose(basis_points, t_star)):
-        print(f"t*={t_star} is already a basis point in interval {i}")
+        if verbose:
+            print(f"EXIT 2: t*={t_star} is already a basis point in interval {i}")
         return None
 
-    basis_deviations = np.array([deviation(f, S, i, t) for t in basis_points])
+    basis_deviations = np.array([approx.deviation(t) for t in basis_points])
 
     # Absolute deviation at t* must be greater than the absolute deviation at any of the basis points in that interval
     if abs(d_star) <= np.max(np.abs(basis_deviations)) + TOL:
-        print(
-            f"Absolute deviation at t*, {d_star} is <= max absolute deviation at basis points in interval {i}, {np.max(np.abs(basis_deviations))}"
-        )
+        if verbose:
+            print(
+                f"EXIT 2: Absolute deviation at t*, {d_star} is <= max absolute deviation at basis points in interval {i}, {np.max(np.abs(basis_deviations))}"
+            )
         return None
 
     # Get the basis points to the left and right of t_star
@@ -144,9 +169,9 @@ def exchange(i, t_star, d_star, f, S, basis, knots, n):
     t_tilde = None
 
     # Check if the deviation at the left or right basis point has the same sign as the deviation at t*
-    if left_pt is not None and np.sign(deviation(f, S, i, left_pt)) == t_star_sign:
+    if left_pt is not None and np.sign(approx.deviation(left_pt)) == t_star_sign:
         t_tilde = left_pt
-    elif right_pt is not None and np.sign(deviation(f, S, i, right_pt)) == t_star_sign:
+    elif right_pt is not None and np.sign(approx.deviation(right_pt)) == t_star_sign:
         t_tilde = right_pt
 
     # If no such t~ exists, then no exchange is possible
@@ -164,16 +189,17 @@ def exchange(i, t_star, d_star, f, S, basis, knots, n):
 
 # Tarashnin's necessary and sufficient optimality conditions (EXIT 1)
 def check_exit_1(
-    f, S, knots, n, m, global_max, fixed_left_tail=False, fixed_right_tail=False
+    f,
+    approx,
+    knots,
+    n,
+    m,
+    global_max,
+    fixed_left_tail=False,
+    fixed_right_tail=False,
+    verbose=False,
 ):
-
-    pts, signs, _ = helper.find_alternance_points(
-        lambda i, t: deviation(f, S, i, t),
-        knots,
-        global_max=global_max,
-        tol=ALTERNANCE_TOL,
-    )
-
+    pts, signs = approx.alternancesequence()
     pts_and_signs = list(zip(pts, signs))
 
     def points_alternate(points):
@@ -197,9 +223,10 @@ def check_exit_1(
             required -= 1
 
         if len(points) >= required and points_alternate(points):
-            print(
-                f"Condition (i) satisfied in interval {i} with {len(points)} alternance points."
-            )
+            if verbose:
+                print(
+                    f"Condition (i) satisfied in interval {i} with {len(points)} alternance points."
+                )
             return True, pts, signs, (i, i)
 
     # condition (ii)
@@ -260,9 +287,10 @@ def check_exit_1(
             if fixed_right_tail and j == n - 1:
                 total_required -= 1
             if len(combined) >= total_required and points_alternate(combined):
-                print(
-                    f"Condition (ii) satisfied in intervals {i}-{j} with {len(combined)} alternance points"
-                )
+                if verbose:
+                    print(
+                        f"Condition (ii) satisfied in intervals {i}-{j} with {len(combined)} alternance points"
+                    )
                 return True, pts, signs, (i, j)
 
     return False, pts, signs, None
@@ -278,28 +306,22 @@ def gra(
     fixed_left_tail = fixed_left_value is not None
     fixed_right_tail = fixed_right_value is not None
 
-    # Form initial basis and compute initial spline S
+    # Form initial basis and compute initial spline approx
     basis = step_zero(knots, m, n, fixed_left_tail, fixed_right_tail)
     S, delta, a0, a = step_one(
         knots, basis, m, n, f, fixed_left_value, fixed_right_value
     )
+    approx = Spline.Approximation(f, S, (knots[0], knots[-1]), basis=basis)
 
     optimal = False
     exit_type = None
-
     exit_i_star, exit_t_star, exit_d_star = None, None, None
 
     for _ in range(100):
-
-        (max_i, t_max, d_max), (min_i, t_min, d_min), (i_star, t_star, d_star) = (
-            helper.find_extrema_overall(
-                lambda i, t: deviation(f, S, i, t),
-                knots,
-            )
-        )
+        i_star, t_star, d_star = approx.maxdeviation()
 
         optimal, pts, signs, chain = check_exit_1(
-            f, S, knots, n, m, abs(d_star), fixed_left_tail, fixed_right_tail
+            f, approx, knots, n, m, abs(d_star), fixed_left_tail, fixed_right_tail
         )
 
         # Tarashnin's necessary and sufficient optimality conditions satisfied (EXIT 1)
@@ -307,8 +329,9 @@ def gra(
             exit_type = 1
             break
 
-        # modified exchange - allow basis point to be replaced by internal knot
-        new_basis = exchange_function(i_star, t_star, d_star, f, S, basis, knots, n)
+        new_basis = exchange_function(
+            i_star, t_star, d_star, f, approx, basis, knots, n
+        )
 
         # No valid exchange found (EXIT 2)
         if new_basis is None:
@@ -316,34 +339,25 @@ def gra(
             exit_i_star, exit_t_star, exit_d_star = i_star, t_star, d_star
             break
 
-        # Update basis and recompute spline
+        # Update basis and recompute spline approximation
         basis = new_basis
         S, delta, a0, a = step_one(
             knots, basis, m, n, f, fixed_left_value, fixed_right_value
         )
+        approx = Spline.Approximation(f, S, (knots[0], knots[-1]), basis=basis)
 
     # Final maximum absolute deviation
-    _, _, (i_star, t_star, d_star) = helper.find_extrema_overall(
-        lambda i, t: deviation(f, S, i, t), knots
-    )
+    i_star, t_star, d_star = approx.maxdeviation()
+    A = Spline.Approximation(f, S, [knots[0], knots[-1]], basis)
 
     return {
-        "a0": a0,
-        "coefficients": a,
-        "knots": knots,
-        "basis": basis,
-        "S": S,
+        "approximation": A,
         "delta": delta,
-        "d_max": abs(d_star),
-        "i_star": i_star,
-        "t_star": t_star,
         "optimal": optimal,
         "exit_type": exit_type,
-        "alternance_points": pts,
-        "signs": signs,
         "chain": chain,
-        "exit_t_star": exit_t_star,
         "exit_i_star": exit_i_star,
+        "exit_t_star": exit_t_star,
         "exit_d_star": exit_d_star,
     }
 
@@ -361,32 +375,44 @@ if __name__ == "__main__":
     knots = [a, 0.38, b]
 
     result = gra(f, knots, m, n, exchange_function=exchange)
-
     if result["exit_type"] == 1:
         print("EXIT 1 (spline is optimal). Chain: ", result["chain"])
 
-    print("basis:            ", result["basis"])
-    print("alternance points:", result["alternance_points"])
-    print(f"Max abs deviation: {result["d_max"]:.5f} at t = {result["t_star"]:.5f}")
+    print("basis:            ", result["approximation"].basis)
+    print("alternance points:", result["approximation"].alternancesequence()[0])
+
+    d_max = result["approximation"].maxdeviation()[2]
+    print(
+        f"Max abs deviation: {d_max:.5f} at t = {result['approximation'].maxdeviation()[1]:.5f}"
+    )
 
     status = "Optimal" if result["optimal"] else "Not optimal"
 
-    plotting.plot_detailed(
-        f,
-        result["S"],
-        a,
-        b,
-        knots=knots,
-        points=result["basis"],
+    # result["approximation"].plot_functions(
+    #     plot_title=(
+    #         f"Degree-{m} spline approximation of {f_label}. {k} internal knots ({status})."
+    #     ),
+    #     plot_name=f"approx_orig_{function_name}_a{a}_b{b}_k{k}_m{m}.png",
+    # )
+
+    # result["approximation"].plot_deviation(
+    #     plot_title=(
+    #         f"Deviation of degree-{m} spline approximation of {f_label}. {k} internal knots ({status})."
+    #     ),
+    #     plot_name=f"dev_orig_{function_name}_k{k}_m{m}.png",
+    # )
+
+    plotting.plot_duo(
+        result["approximation"],
+        points=result["approximation"].basis,
         f_label=f_label,
-        approximation_label="Spline approximation",
-        points_label="Basis points",
+        approximation_label=rf"$S_{{{m}}}(t)$",
         title=(
             f"Degree-{m} spline approximation of {f_label}. "
             f"{k} internal knots ({status}). "
-            f"Max abs deviation: {result['d_max']:.5f}."
+            f"Max abs deviation: {d_max:.5f}."
         ),
-        file_name=f"orig_{function_name}_a{a}_b{b}_k{k}_m{m}.png",
+        file_name=f"duo_orig_{function_name}_k{k}_m{m}.png",
     )
 
     # plotting.plot_report(
