@@ -34,8 +34,6 @@ def fixed_left_tail(f, a, theta, b, m):
 
     return {
         "approximation": approx,
-        "tail_approximation": left_approx,
-        "gra_approximation": right_approx,
         "d_max": abs(d_left),
         "gra_d_max": abs(d_gra),
         "case": 2,
@@ -68,8 +66,6 @@ def fixed_right_tail(f, a, theta, b, m):
 
     return {
         "approximation": approx,
-        "tail_approximation": right_approx,
-        "gra_approximation": left_approx,
         "d_max": abs(d_right),
         "gra_d_max": abs(d_gra),
         "case": 3,
@@ -135,8 +131,6 @@ def psi(f, a, b, theta, m, n, verbose=False):
             )
 
         fixed_left = fixed_left_tail(f, a, theta, b, m)
-        # _, _, d_left = fixed_left["tail_approximation"].maxdeviation()
-        # _, _, d_left_gra = fixed_left["gra_approximation"].maxdeviation()
 
         # Compare the differences between gra_d_max and d_max for both fixed_left and fixed_right
         fixed_left_diff = abs(fixed_left["gra_d_max"] - fixed_left["d_max"])
@@ -224,7 +218,9 @@ def opt(
         if g >= 0 or abs(g) < tolerance:
             break
 
-        theta_next = armijo(f, a, b, theta, psi_theta, m, n, g, d, rho, c, verbose)
+        theta_next = armijo(
+            f, a, b, theta, psi_theta, m, n, g, d, rho, c, verbose=verbose
+        )
 
         if abs(theta_next - theta) < tolerance:
             break
