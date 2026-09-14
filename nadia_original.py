@@ -2,7 +2,6 @@
 # GRA and GRAFT (unmodified)
 import numpy as np
 
-import helper
 import plotting
 import Spline
 import test_functions
