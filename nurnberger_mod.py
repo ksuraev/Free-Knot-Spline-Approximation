@@ -10,9 +10,9 @@ ALTERNANCE_TOL = 1e-4
 TOL = 1e-5
 
 
-def subroutine(f, x_i, b, degree, d_n, max_iter):
+def subroutine(f, x_i, b, m, d_n, max_iter):
     """Find x_min and x_max for the next interval."""
-    d_i, _ = nurnberger.d(f, x_i, b, degree)
+    d_i, _ = nurnberger.d(f, x_i, b, m)
 
     # If the deviation on [x_i, b] is less than or equal to d_n, then no new knot can be placed in this interval
     if d_i <= d_n:
@@ -26,7 +26,7 @@ def subroutine(f, x_i, b, degree, d_n, max_iter):
         x_bar = (x_l + x_u) / 2
 
         # Compute the maximum deviation on [x_i, x_bar]
-        d_i_max, approx = nurnberger.d(f, x_i, x_bar, degree)
+        d_i_max, approx = nurnberger.d(f, x_i, x_bar, m)
 
         # If the upper and lower bounds are sufficiently close, we have found x_max
         if x_u - x_l < TOL:
@@ -41,16 +41,16 @@ def subroutine(f, x_i, b, degree, d_n, max_iter):
     # x_max is the upper bound of the last interval where the deviation was less than or equal to d_n
     x_max = x_l
 
-    # Approximation on [x_i, x_max] is used to find the (degree + 2)-th alternance point
-    approx = remez.remez(f, x_i, x_max, degree)
-    x_min = approx.basis[degree + 1]
+    # Approximation on [x_i, x_max] is used to find the (m + 2)-th alternance point
+    approx = remez.remez(f, x_i, x_max, m)
+    x_min = approx.basis[m + 1]
 
     return x_min, x_max
 
 
-def discontinuous_spline(f, a, b, k, degree, tolerance=1e-6, max_iter=100):
-    """Construct the Nurnberger free-knot spline approximation."""
-    knots, d_min, d_max = nurnberger.step_zero(f, a, b, k, degree)
+def discontinuous_spline(f, a, b, k, m, max_iter=100, verbose=False):
+    """Construct the modified Nurnberger free-knot spline approximation."""
+    knots, d_min, d_max = nurnberger.step_zero(f, a, b, k, m)
 
     x_min = None
     x_max = None
@@ -59,7 +59,7 @@ def discontinuous_spline(f, a, b, k, degree, tolerance=1e-6, max_iter=100):
     approximations = None
 
     for iteration in range(max_iter):
-        if abs(d_max - d_min) < tolerance * d_max:
+        if abs(d_max - d_min) < TOL * d_max:
             break
 
         # target deviation for this iteration computed as geometric mean
@@ -71,19 +71,19 @@ def discontinuous_spline(f, a, b, k, degree, tolerance=1e-6, max_iter=100):
 
         # Subroutine: solve d(x_i, x_bar) = d_n while knots can be placed
         for i in range(k):
-            x_min, x_max = subroutine(f, x_i, b, degree, d_n, max_iter)
+            x_min, x_max = subroutine(f, x_i, b, m, d_n, max_iter)
             if x_min is None or x_max is None:
                 break
             new_knots.append(x_min)
 
             # spline interval is [x_i, x_min].
-            approx_i = remez.remez(f, x_i, x_min, degree)
+            approx_i = remez.remez(f, x_i, x_min, m, verbose=verbose)
             new_approximations.append(approx_i)
 
             x_i = x_min
 
         # Final interval [x_i, b].
-        c_n, final_approx = nurnberger.d(f, x_i, b, degree)
+        c_n, final_approx = nurnberger.d(f, x_i, b, m)
 
         new_knots.append(b)
         new_approximations.append(final_approx)
@@ -98,14 +98,19 @@ def discontinuous_spline(f, a, b, k, degree, tolerance=1e-6, max_iter=100):
     # Handle convergence before the first iteration
     if approximations is None:
         approximations = [
-            remez.remez(f, knots[i], knots[i + 1], degree)
-            for i in range(len(knots) - 1)
+            remez.remez(f, knots[i], knots[i + 1], m) for i in range(len(knots) - 1)
         ]
 
     S = Spline.Spline(knots, [approx.g for approx in approximations])
 
     basis = [approx.basis for approx in approximations]
     approx = Spline.Approximation(f, S, (a, b), basis=basis)
+
+    if verbose:
+        print(f"Final max abs deviation: {abs(approx.maxdeviation()[2]):.5f}")
+        print(f"Final knots: {approx.g.knots}")
+        print(f"Final basis: {approx.basis}")
+        print(f"x_min: {x_min}, x_max: {x_max}")
 
     return approx, x_min, x_max
 
@@ -120,19 +125,12 @@ if __name__ == "__main__":
 
     approx, x_min, x_max = discontinuous_spline(f, a, b, k, m)
 
-    _, t_star, d_star = approx.maxdeviation()
-
-    print(f"Max deviation: {abs(d_star)}")
-    print(f"knots: {approx.g.knots}")
-    print(f"basis: {approx.basis}")
-    print(f"x_min: {x_min}, x_max: {x_max}")
-
     plotting.plot_duo(
         approx,
         points=approx.basis,
         f_label=f_label,
         approximation_label="Piecewise polynomial approximation",
         points_label="Alternance points",
-        title=f"Degree-{m} approximation with {len(approx.g.knots) - 2} free knots.",
+        title=f"Degree-{m} approximation with {len(approx.g.knots) - 2} free knot(s).",
         file_name=f"nberger_mod_{function_name}_a{a}_b{b}_k{k}_m{m}.png",
     )

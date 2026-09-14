@@ -9,21 +9,21 @@ import test_functions
 TOL = 1e-5
 
 
-def d(f, a, b, degree):
+def d(f, a, b, m):
     """Return the maximum absolute deviation and Remez approximation on [a, b]."""
-    approx = remez.remez(f, a, b, degree)
+    approx = remez.remez(f, a, b, m)
     _, _, d_max = approx.maxdeviation()
 
     return abs(d_max), approx
 
 
-def step_zero(f, a, b, k, degree):
+def step_zero(f, a, b, k, m):
     """Compute the initial knots and the maximum and minimum deviation over the interval [a,b]"""
     knots = np.linspace(a, b, k + 2)
     deviations = []
 
     for i in range(len(knots) - 1):
-        d_i_max, _ = d(f, knots[i], knots[i + 1], degree)
+        d_i_max, _ = d(f, knots[i], knots[i + 1], m)
         deviations.append(d_i_max)
 
     d_min = min(deviations)
@@ -32,15 +32,15 @@ def step_zero(f, a, b, k, degree):
     return knots, d_min, d_max
 
 
-def run(f, a, b, k, degree, tolerance=1e-6, max_iter=100):
-    """Run the Nurnberger algorithm to find the optimal placement of k free knots in the interval [a,b] for polynomial approximation of degree 'degree'."""
-    knots, d_min, d_max = step_zero(f, a, b, k, degree)
+def run(f, a, b, k, m, max_iter=100, verbose=False):
+    """Construct the Nurnberger free-knot spline approximation."""
+    knots, d_min, d_max = step_zero(f, a, b, k, m)
 
     # Track the approximations for each subinterval
     approximations = None
 
     for iteration in range(max_iter):
-        if abs(d_max - d_min) < tolerance * d_max:
+        if abs(d_max - d_min) < TOL * d_max:
             break
 
         # target deviation for this iteration computed as geometric mean
@@ -52,7 +52,7 @@ def run(f, a, b, k, degree, tolerance=1e-6, max_iter=100):
 
         # Subroutine: solve d(x_i, x_bar) = d_n while knots can be placed
         for z in range(k):
-            d_i, _ = d(f, x_i, b, degree)
+            d_i, _ = d(f, x_i, b, m)
             if d_i <= d_n:
                 break
 
@@ -60,9 +60,10 @@ def run(f, a, b, k, degree, tolerance=1e-6, max_iter=100):
             x_l = x_i
             x_u = b
 
+            # Use bisection method to find x_bar such that d(x_i, x_bar) = d_n
             for _ in range(max_iter):
                 x_bar = (x_l + x_u) / 2
-                d_i_max, approx_i = d(f, x_i, x_bar, degree)
+                d_i_max, approx_i = d(f, x_i, x_bar, m)
 
                 if abs(d_i_max - d_n) < TOL * d_n:
                     break
@@ -76,7 +77,7 @@ def run(f, a, b, k, degree, tolerance=1e-6, max_iter=100):
             x_i = x_bar
 
         # Final real interval
-        c_n, final_approx = d(f, x_i, b, degree)
+        c_n, final_approx = d(f, x_i, b, m)
 
         new_knots.append(b)
         new_approximations.append(final_approx)
@@ -91,15 +92,20 @@ def run(f, a, b, k, degree, tolerance=1e-6, max_iter=100):
     # If convergence happened before any new approximations were built
     if approximations is None:
         approximations = [
-            remez.remez(f, knots[i], knots[i + 1], degree)
-            for i in range(len(knots) - 1)
+            remez.remez(f, knots[i], knots[i + 1], m) for i in range(len(knots) - 1)
         ]
 
     S = Spline.Spline(knots, [approx.g for approx in approximations])
-
     basis = [approx.basis for approx in approximations]
+    approx = Spline.Approximation(f, S, (a, b), basis=basis)
 
-    return Spline.Approximation(f, S, (a, b), basis=basis)
+    if verbose:
+        _, t_star, d_star = approx.maxdeviation()
+        print(f"Final max abs deviation: {abs(d_star):.5f} at t*={t_star:.5f}")
+        print(f"Final knots: {S.knots}")
+        print(f"Final basis: {basis}")
+
+    return approx
 
 
 if __name__ == "__main__":
@@ -108,16 +114,10 @@ if __name__ == "__main__":
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
     a, b = -1, 1
-    k = 1
-    degree = 1
+    k = 7
+    m = 1
 
-    approx = run(f, a, b, k, degree)
-
-    _, t_star, d_star = approx.maxdeviation()
-
-    print(f"Max deviation: {abs(d_star)}")
-    print(f"knots: {approx.g.knots}")
-    print(f"basis: {approx.basis}")
+    approx = run(f, a, b, k, m)
 
     plotting.plot_duo(
         approx,
@@ -125,6 +125,6 @@ if __name__ == "__main__":
         f_label=f_label,
         approximation_label="Piecewise polynomial approximation",
         points_label="Alternance points",
-        title=f"Degree-{degree} approximation with {len(approx.g.knots) - 2} free knots.",
-        file_name=f"nberger_{function_name}_a{a}_b{b}_k{k}_m{degree}.png",
+        title=f"Degree-{m} approximation with {len(approx.g.knots) - 2} free knots.",
+        file_name=f"nberger_{function_name}_a{a}_b{b}_k{k}_m{m}.png",
     )
