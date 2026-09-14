@@ -10,6 +10,7 @@ import test_functions
 
 
 def fixed_left_tail(f, a, theta, b, m):
+    """Compute the best spline approximation with a fixed left tail at theta."""
     # Best polynomial approximation on [a, theta]
     left_approx = remez.remez(f, a, theta, m)
 
@@ -42,6 +43,7 @@ def fixed_left_tail(f, a, theta, b, m):
 
 
 def fixed_right_tail(f, a, theta, b, m):
+    """Compute the best spline approximation with a fixed right tail at theta."""
     # Best polynomial approximation on [theta, b]
     right_approx = remez.remez(f, theta, b, m)
 
@@ -74,6 +76,7 @@ def fixed_right_tail(f, a, theta, b, m):
 
 
 def psi(f, a, b, theta, m, n, verbose=False):
+    """Compute the maximum deviation of the best spline approximation with a knot at theta."""
     two_int_chain = nadia_mod.gra(f, [a, theta, b], m, n)
 
     # Case 1: found optimal spline across two intervals
@@ -123,7 +126,7 @@ def psi(f, a, b, theta, m, n, verbose=False):
     # Start with [theta, b] as minimal chain
     fixed_right = fixed_right_tail(f, a, theta, b, m)
 
-    # [theta, b] is wrong choice for minimal chain, swap to [a, theta]
+    # [theta, b] is wrong choice for minimal chain, try [a, theta]
     if fixed_right["gra_d_max"] > fixed_right["d_max"] + 1e-1:
         if verbose:
             print(
@@ -148,39 +151,47 @@ def psi(f, a, b, theta, m, n, verbose=False):
 
 
 def directional_derivative(f, a, b, theta, psi_theta, m, n, h):
+    """Directional derivative of psi at theta in the direction of h."""
     psi_theta_h = psi(f, a, b, theta + h, m, n)["d_max"]
 
     return (psi_theta_h - psi_theta) / abs(h)
 
 
 def armijo(f, a, b, theta, psi_theta, m, n, g, d, rho=0.5, c=0.1, verbose=False):
+    """Armijo line search to find the next theta in the direction of d."""
     if d < 0:
         alpha = a - theta / d
     else:
         alpha = (b - theta) / d
 
     while alpha > 1e-8:
+        # Compute the next theta using the step size alpha
         theta_next = theta + alpha * d
 
+        # Check if theta_next is within the interval [a, b]
         if theta_next <= a or theta_next >= b:
             alpha *= rho
             continue
 
+        # Compute psi at the new theta
         psi_next = psi(f, a, b, theta_next, m, n, verbose=verbose)["d_max"]
+
         if verbose:
             print(
                 f"alpha={alpha:.10f}, theta_next={theta_next:.10f}, psi_next={psi_next:.10f}, psi_theta={psi_theta:.10f}, g={g:.10f}, d={d:.10f}"
             )
 
+        # Check the Armijo condition
         if psi_next <= psi_theta + c * alpha * g:
             return theta_next
 
+        # If the Armijo condition is not satisfied, reduce alpha and try again
         alpha *= rho
 
     return theta
 
 
-def opt(
+def find_optimal_theta(
     f,
     a,
     b,
@@ -195,12 +206,13 @@ def opt(
     max_iter=30,
     verbose=False,
 ):
+    """Find the optimal theta that minimises psi(theta) using directional derivatives and Armijo line search."""
     theta = x_min
 
     for k in range(max_iter):
+        # Compute the directional derivatives at the current theta
         psi_theta = psi(f, a, b, theta, m, n, verbose=verbose)["d_max"]
         g_plus = directional_derivative(f, a, b, theta, psi_theta, m, n, h)
-
         g_minus = directional_derivative(f, a, b, theta, psi_theta, m, n, -h)
 
         if verbose:
@@ -208,6 +220,7 @@ def opt(
                 f"k={k}, theta={theta:.10f}, psi={psi_theta:.10f} g_plus={g_plus:.10f}, g_minus={g_minus:.10f}"
             )
 
+        # Determine the search direction based on the directional derivatives
         if g_plus <= g_minus:
             d = h
             g = g_plus
@@ -218,17 +231,19 @@ def opt(
         if g >= 0 or abs(g) < tolerance:
             break
 
+        # Use Armijo line search to find the next theta
         theta_next = armijo(
             f, a, b, theta, psi_theta, m, n, g, d, rho, c, verbose=verbose
         )
 
+        # Check for convergence based on the change in theta
         if abs(theta_next - theta) < tolerance:
             break
 
         theta = theta_next
 
     else:
-        print(f"Maximum iterations ({max_iter}) reached in opt()")
+        print(f"Maximum iterations ({max_iter}) reached in find_optimal_theta()")
 
     psi_theta = psi(f, a, b, theta, m, n)
 
@@ -238,6 +253,7 @@ def opt(
 def plot_psi(
     f, f_label, a, b, m, n, theta_start, theta_end, file_name, step=0.05, verbose=False
 ):
+    """Plot the function psi(theta) over the interval [theta_start, theta_end]."""
     thetas = np.arange(theta_start, theta_end, step)
 
     psi_values = []
@@ -291,7 +307,7 @@ if __name__ == "__main__":
         x_min = approx.g.knots[1]
 
     # Find optimal theta
-    theta_opt, psi_result = opt(f, a, b, m, n, x_min, x_max)
+    theta_opt, psi_result = find_optimal_theta(f, a, b, m, n, x_min, x_max)
 
     print(
         f"optimal theta: {theta_opt:.10f}, psi(theta_opt): {psi_result['d_max']:.10f}"
