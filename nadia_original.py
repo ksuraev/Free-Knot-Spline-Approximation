@@ -125,11 +125,6 @@ def step_one(knots, basis, m, n, f, fixed_left_value=None, fixed_right_value=Non
     return S, delta, a0, a  # remove a0, a
 
 
-# Compute the deviation between f and spline S at point t
-# def deviation(f, S, i, t):
-#     return f(t) - S(t)
-
-
 def exchange(i, t_star, d_star, f, approx, basis, knots, n, verbose=False):
     """VP basis exchange function. Returns new basis if exchange is possible, otherwise returns None."""
     # t* cannot be an internal knot
@@ -211,9 +206,7 @@ def check_exit_1(
 
     # condition (i): in one subinterval, there is at least m+2 alternance points
     for i in range(n):
-
         points = [(t, s) for t, s in pts_and_signs if (knots[i] <= t <= knots[i + 1])]
-
         required = m + 2
 
         if fixed_left_tail and i == 0:
@@ -231,7 +224,6 @@ def check_exit_1(
     # condition (ii)
     for i in range(n):
         for j in range(i + 1, n):
-
             chain_intervals = []
 
             for k in range(i, j + 1):
@@ -243,7 +235,6 @@ def check_exit_1(
                         for t, s in pts_and_signs
                         if (knots[k] <= t <= knots[k + 1])
                     ]
-
                 else:
                     # Subsequent intervals: (θ_k, θ_{k+1}]
                     points = [
@@ -297,7 +288,14 @@ def check_exit_1(
 
 # generalised Remez algorithm
 def gra(
-    f, knots, m, n, exchange_function, fixed_left_value=None, fixed_right_value=None
+    f,
+    knots,
+    m,
+    n,
+    exchange_function,
+    fixed_left_value=None,
+    fixed_right_value=None,
+    verbose=False,
 ):
     """Run the generalised Remez algorithm to find the optimal spline approximation of f.
     Optionally, fixed values can be specified for the left and right tails."""
@@ -320,7 +318,15 @@ def gra(
         i_star, t_star, d_star = approx.maxdeviation()
 
         optimal, pts, signs, chain = check_exit_1(
-            f, approx, knots, n, m, abs(d_star), fixed_left_tail, fixed_right_tail
+            f,
+            approx,
+            knots,
+            n,
+            m,
+            abs(d_star),
+            fixed_left_tail,
+            fixed_right_tail,
+            verbose=verbose,
         )
 
         # Tarashnin's necessary and sufficient optimality conditions satisfied (EXIT 1)
@@ -329,7 +335,7 @@ def gra(
             break
 
         new_basis = exchange_function(
-            i_star, t_star, d_star, f, approx, basis, knots, n
+            i_star, t_star, d_star, f, approx, basis, knots, n, verbose=verbose
         )
 
         # No valid exchange found (EXIT 2)
@@ -362,7 +368,7 @@ def gra(
 
 
 if __name__ == "__main__":
-    function_name = "g"
+    function_name = "f_g"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
     a, b = -1, 1
@@ -373,7 +379,7 @@ if __name__ == "__main__":
     # Choose initial knots
     knots = [a, 0.38, b]
 
-    result = gra(f, knots, m, n, exchange_function=exchange)
+    result = gra(f, knots, m, n, exchange_function=exchange, verbose=True)
     if result["exit_type"] == 1:
         print("EXIT 1 (spline is optimal). Chain: ", result["chain"])
 
@@ -387,20 +393,6 @@ if __name__ == "__main__":
 
     status = "Optimal" if result["optimal"] else "Not optimal"
 
-    # result["approximation"].plot_functions(
-    #     plot_title=(
-    #         f"Degree-{m} spline approximation of {f_label}. {k} internal knots ({status})."
-    #     ),
-    #     plot_name=f"approx_orig_{function_name}_a{a}_b{b}_k{k}_m{m}.png",
-    # )
-
-    # result["approximation"].plot_deviation(
-    #     plot_title=(
-    #         f"Deviation of degree-{m} spline approximation of {f_label}. {k} internal knots ({status})."
-    #     ),
-    #     plot_name=f"dev_orig_{function_name}_k{k}_m{m}.png",
-    # )
-
     plotting.plot_duo(
         result["approximation"],
         points=result["approximation"].basis,
@@ -413,16 +405,3 @@ if __name__ == "__main__":
         ),
         file_name=f"duo_orig_{function_name}_k{k}_m{m}.png",
     )
-
-    # plotting.plot_report(
-    #     f,
-    #     result["S"],
-    #     a,
-    #     b,
-    #     knots=knots,
-    #     points=result["alternance_points"],
-    #     f_label=f_label,
-    #     approximation_label=rf"$S_{{{m}}}(t)$",
-    #     points_label="Alternance points",
-    #     file_name=f"r_orig_{function_name}_k{k}_m{m}.png",
-    # )
