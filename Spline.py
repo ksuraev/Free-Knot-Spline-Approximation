@@ -180,12 +180,11 @@ class SUSpline(Spline):
 class Approximation:
     """An approximation of f by g."""
 
-    def __init__(self, f, g, interval, basis=None, max_deviation=None):
+    def __init__(self, f, g, interval, basis=None):
         self.f = f
         self.g = g
         self.interval = interval
         self.basis = basis
-        self.max_deviation = max_deviation
 
     def deviation(self, t):
         """Return the signed deviation f(t) - g(t)."""
@@ -224,17 +223,11 @@ class Approximation:
         return extrema
 
     def maxdeviation(self, n_samples=10000):
-        if self.max_deviation is not None:
-            return self.max_deviation
-
         extrema = self._extrema(n_samples)
 
-        self.max_deviation = max(
-            extrema,
-            key=lambda x: abs(x[2]),
-        )
+        d_max = max(extrema, key=lambda x: abs(x[2]))
 
-        return self.max_deviation
+        return d_max
 
     def maxdeviationpoints(self, tol=1e-5, n_samples=10000):
         """Return all points attaining the maximum absolute deviation."""
