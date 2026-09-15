@@ -43,43 +43,6 @@ def build_P(basis, knots, m):
     )
 
 
-def build_simplex_system(f, samples, knots, m):
-    P = build_P(samples, knots, m)
-    M = np.concatenate([np.ones((len(samples), 1)), P], axis=1)
-
-    # Stack M and -M vertically
-    A = np.concatenate([M, -M], axis=0)
-
-    # add column of ones
-    A = np.concatenate([A, -np.ones((2 * len(samples), 1))], axis=1)
-
-    b = np.concatenate([f(samples), -f(samples)], axis=0)
-    return A, b
-
-
-def build_gradients(basis, S, signs):
-    P = build_P(basis, S.knots, S.degree)
-    P = np.transpose(P)
-
-    M = np.zeros((len(S.knots) - 2, P.shape[1]))
-
-    for i, knot in enumerate(S.knots[1:-1]):
-        col = 0
-        for b in basis:
-            for t in b:
-                if t > knot:
-                    M[i, col] = sum(
-                        -(j + 1) * a[i, j] * (t - knot) ** j for j in range(m)
-                    )
-
-                col += 1
-
-    G = np.concatenate([np.ones((1, P.shape[1])), P, M], axis=0)
-    G = np.multiply(G, signs)
-
-    return G
-
-
 # Step 1: Solve the linear system to find the spline coefficients and delta
 def step_one(knots, basis, m, n, f, fixed_left_value=None, fixed_right_value=None):
     temp_basis = basis.copy()
@@ -391,19 +354,7 @@ if __name__ == "__main__":
     n = k + 1  # number of subintervals
 
     # Choose initial knots
-    knots = np.array(
-        [
-            -1,
-            -5 / 6,
-            -1 / 2,
-            -1 / 6,
-            0,
-            1 / 6,
-            1 / 2,
-            5 / 6,
-            1,
-        ]
-    )
+    knots = np.array([-1, -5 / 6, -1 / 2, -1 / 6, 0, 1 / 6, 1 / 2, 5 / 6, 1])
 
     result = gra(f, knots, m, n, exchange_function=exchange, verbose=True)
 
