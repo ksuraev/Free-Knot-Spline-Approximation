@@ -113,7 +113,7 @@ if __name__ == "__main__":
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
     a, b = -1, 1
-    m = 16
+    m = 40
 
     approx = remez(f, a, b, m)
 

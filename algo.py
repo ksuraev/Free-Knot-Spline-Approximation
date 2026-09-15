@@ -152,7 +152,7 @@ def psi(f, a, b, theta, m, n, verbose=False):
 
 
 def directional_derivative(f, a, b, theta, psi_theta, m, n, h):
-    """Directional derivative of psi at theta in the direction of h."""
+    """Directional derivative of psi at theta in the direction of h using finite differences."""
     psi_theta_h = psi(f, a, b, theta + h, m, n)["d_max"]
 
     return (psi_theta_h - psi_theta) / abs(h)

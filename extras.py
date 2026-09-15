@@ -10,7 +10,7 @@ import test_functions
 
 def build_gradients(basis, S, signs):
     P = nadia_original.build_P(basis, S.knots, S.degree)
-    P = np.transpose(P)
+    P = P.T
 
     M = np.zeros((len(S.knots) - 2, P.shape[1]))
     a = [p.coef[1:] for p in S.polynomials]
@@ -30,7 +30,7 @@ def build_gradients(basis, S, signs):
 
 def find_descent_direction(basis, S, signs):
     G = build_gradients(basis, S, signs)
-    P = G.transpose() @ G
+    P = G.T @ G
     q = np.zeros(G.shape[1])
     A = np.ones(G.shape[1])
     b = np.ones(1)
