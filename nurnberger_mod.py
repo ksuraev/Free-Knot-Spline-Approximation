@@ -11,7 +11,7 @@ TOL = 1e-5
 
 
 def subroutine(f, x_i, b, m, d_n, max_iter):
-    """Find x_min and x_max for the next interval."""
+    """Find x_min as the last alternance point in the interval [x_i, x_bar] such that d(x_i, x_bar) = d_n."""
     d_i, _ = nurnberger.d(f, x_i, b, m)
 
     # If the deviation on [x_i, b] is less than or equal to d_n, then no new knot can be placed in this interval
@@ -22,14 +22,17 @@ def subroutine(f, x_i, b, m, d_n, max_iter):
     x_l = x_i
     x_u = b
 
+    approx = None
+
     for _ in range(max_iter):
         x_bar = (x_l + x_u) / 2
 
-        # Compute the maximum deviation on [x_i, x_bar]
-        d_i_max, approx = nurnberger.d(f, x_i, x_bar, m)
+        # Compute the maximum deviation on [x_i, x_bar] via Remez algorithm
+        d_i_max, approx_i = nurnberger.d(f, x_i, x_bar, m)
 
-        # If the upper and lower bounds are sufficiently close, we have found x_max
-        if x_u - x_l < TOL:
+        # If the deviation is close enough to the target, we have found x_min
+        if abs(d_i_max - d_n) <= TOL:
+            approx = approx_i
             break
 
         # Determine which half of the interval to keep based on the deviation
@@ -38,14 +41,12 @@ def subroutine(f, x_i, b, m, d_n, max_iter):
         else:
             x_u = x_bar
 
-    # x_max is the upper bound of the last interval where the deviation was less than or equal to d_n
-    x_max = x_l
+        approx = approx_i
 
-    # Approximation on [x_i, x_max] is used to find the (m + 2)-th alternance point
-    approx = remez.remez(f, x_i, x_max, m)
-    x_min = approx.basis[m + 1]
+    # x_min is the last alternance point in the interval [x_i, x_bar]
+    x_min = approx.basis[-1]
 
-    return x_min, x_max
+    return x_min
 
 
 def discontinuous_spline(f, a, b, k, m, max_iter=100, verbose=False):
@@ -53,7 +54,6 @@ def discontinuous_spline(f, a, b, k, m, max_iter=100, verbose=False):
     knots, d_min, d_max = nurnberger.step_zero(f, a, b, k, m)
 
     x_min = None
-    x_max = None
     d_n = None
 
     approximations = None
@@ -71,9 +71,10 @@ def discontinuous_spline(f, a, b, k, m, max_iter=100, verbose=False):
 
         # Subroutine: solve d(x_i, x_bar) = d_n while knots can be placed
         for i in range(k):
-            x_min, x_max = subroutine(f, x_i, b, m, d_n, max_iter)
-            if x_min is None or x_max is None:
+            x_min = subroutine(f, x_i, b, m, d_n, max_iter)
+            if x_min is None:
                 break
+
             new_knots.append(x_min)
 
             # spline interval is [x_i, x_min].
@@ -110,9 +111,9 @@ def discontinuous_spline(f, a, b, k, m, max_iter=100, verbose=False):
         print(f"Final max abs deviation: {abs(approx.maxdeviation()[2]):.5f}")
         print(f"Final knots: {approx.g.knots}")
         print(f"Final basis: {approx.basis}")
-        print(f"x_min: {x_min}, x_max: {x_max}")
+        print(f"x_min: {x_min}")
 
-    return approx, x_min, x_max
+    return approx, x_min
 
 
 if __name__ == "__main__":
@@ -123,7 +124,7 @@ if __name__ == "__main__":
     k = 1  # number of free knots (not including a and b)
     m = 1  # degree of polynomial to fit
 
-    approx, x_min, x_max = discontinuous_spline(f, a, b, k, m)
+    approx, x_min = discontinuous_spline(f, a, b, k, m)
 
     plotting.plot_duo(
         approx,
