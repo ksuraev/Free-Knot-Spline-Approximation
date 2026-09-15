@@ -240,7 +240,7 @@ class Approximation:
 
         return [(t, d) for _, t, d in extrema if abs(abs(d) - global_max) <= tol]
 
-    def alternancesequence(self, tol=1e-5, n_samples=10000):
+    def alternancesequence(self, tol=1e-4, n_samples=10000):
         """Return largest sequence of alternance points, with their signs."""
         points = self.maxdeviationpoints(tol=tol, n_samples=n_samples)
 
