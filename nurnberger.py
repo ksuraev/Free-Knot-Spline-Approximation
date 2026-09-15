@@ -95,6 +95,7 @@ def run(f, a, b, k, m, max_iter=100, verbose=False):
             remez.remez(f, knots[i], knots[i + 1], m) for i in range(len(knots) - 1)
         ]
 
+    # Create the final spline and approximation
     S = Spline.Spline(knots, [approx.g for approx in approximations])
     basis = [approx.basis for approx in approximations]
     approx = Spline.Approximation(f, S, (a, b), basis=basis)

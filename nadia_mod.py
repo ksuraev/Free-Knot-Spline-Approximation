@@ -126,6 +126,7 @@ def gra(
     fixed_right_value=None,
     verbose=False,
 ):
+    """Run the modified GRA algorithm with the provided exchange function."""
     return nadia_original.gra(
         f,
         knots,

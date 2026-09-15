@@ -109,11 +109,11 @@ def remez(f, a, b, m, max_iter=10000, verbose=False):
 
 
 if __name__ == "__main__":
-    function_name = "g"
+    function_name = "f_g"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
     a, b = -1, 1
-    m = 10
+    m = 16
 
     approx = remez(f, a, b, m)
 

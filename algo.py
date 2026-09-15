@@ -63,6 +63,7 @@ def fixed_right_tail(f, a, theta, b, m):
 
     approx = Spline.Approximation(f, S, [a, b], basis=basis)
 
+    # Get the maximum deviations for both the left and right approximations
     _, _, d_right = right_approx.maxdeviation()
     _, _, d_gra = left_approx.maxdeviation()
 
@@ -247,6 +248,11 @@ def find_optimal_theta(
 
     psi_theta = psi(f, a, b, theta, m, n)
 
+    if verbose:
+        print(
+            f"Optimal theta found: {theta:.10f} with psi(theta)={psi_theta['d_max']:.10f}"
+        )
+
     return theta, psi_theta
 
 
@@ -301,16 +307,15 @@ if __name__ == "__main__":
     n = k + 1
     m = 1
 
+    # TODO: unused x_max
     approx, x_min, x_max = nurnberger_mod.discontinuous_spline(f, a, b, k, m)
 
     if x_min is None:
         x_min = approx.g.knots[1]
 
     # Find optimal theta
-    theta_opt, psi_result = find_optimal_theta(f, a, b, m, n, x_min, x_max)
-
-    print(
-        f"optimal theta: {theta_opt:.10f}, psi(theta_opt): {psi_result['d_max']:.10f}"
+    theta_opt, psi_result = find_optimal_theta(
+        f, a, b, m, n, x_min, x_max, verbose=True
     )
 
     def case(case_num):

@@ -10,9 +10,11 @@ TOL = 1e-5
 ALTERNANCE_TOL = 1e-5
 
 
-# Step 0: Form intial basis - m per internal subinterval, m+1 per endpoint subinterval.
-# Internal spline knots are excluded from the basis
+# TODO: check about fixed tails - we need m points in fixed tails?
 def step_zero(knots, m, n, fixed_left_tail=False, fixed_right_tail=False):
+    """Form initial basis for the spline approximation.
+    m points per internal subinterval and m+1 points per endpoint subinterval.
+    Internal spline knots are excluded from the basis."""
     basis = []
 
     for i in range(n):
@@ -20,6 +22,12 @@ def step_zero(knots, m, n, fixed_left_tail=False, fixed_right_tail=False):
         end = knots[i + 1]
 
         pts = m + 1 if (i == 0 or i == n - 1) else m
+        # if i == 0:
+        #     pts = m if fixed_left_tail else m + 1
+        # elif i == n - 1:
+        #     pts = m if fixed_right_tail else m + 1
+        # else:
+        #     pts = m
 
         local_basis = np.linspace(start, end, pts + 2)[1:-1]
         basis.append(local_basis)
@@ -27,9 +35,6 @@ def step_zero(knots, m, n, fixed_left_tail=False, fixed_right_tail=False):
     return basis
 
 
-# d is degree of polynomial in each subinterval
-# we were doing 'for d in range(1, m + 1) for knot in knots' so we got t0^1 t1^1 t2^1 ... t^2 t1^2 t2^2 ... etc
-# but we want t0^1 t0^2 t0^3 ... t1^1 t1^2 t1^3 ..so we need to swap the order of the loops?
 def build_P(basis, knots, m):
     return np.array(
         [
@@ -43,8 +48,8 @@ def build_P(basis, knots, m):
     )
 
 
-# Step 1: Solve the linear system to find the spline coefficients and delta
 def step_one(knots, basis, m, n, f, fixed_left_value=None, fixed_right_value=None):
+    """Solve the linear system for the spline coefficients."""
     temp_basis = basis.copy()
     if fixed_left_value is not None:
         temp_basis.append(np.array([knots[0]]))
@@ -105,7 +110,7 @@ def step_one(knots, basis, m, n, f, fixed_left_value=None, fixed_right_value=Non
 
 
 def exchange(i, t_star, d_star, f, approx, basis, knots, n, verbose=False):
-    """VP basis exchange function. Returns new basis if exchange is possible, otherwise returns None."""
+    """VP basis exchange procedure. Returns new basis if exchange is possible, otherwise returns None."""
     # t* cannot be an internal knot
     for j in range(1, n):
         if abs(t_star - knots[j]) <= TOL:
@@ -160,7 +165,6 @@ def exchange(i, t_star, d_star, f, approx, basis, knots, n, verbose=False):
     return new_basis
 
 
-# Tarashnin's necessary and sufficient optimality conditions (EXIT 1)
 def check_exit_1(
     approx,
     knots,
@@ -171,6 +175,8 @@ def check_exit_1(
     fixed_right_tail=False,
     verbose=False,
 ):
+    """Check if the spline approximation satisfies Tarashnin's necessary and sufficient optimality conditions (EXIT 1)."""
+    # Get points of alternance and their signs
     pts, signs = approx.alternancesequence()
     pts_and_signs = list(zip(pts, signs))
 
@@ -275,8 +281,9 @@ def gra(
     fixed_right_value=None,
     verbose=False,
 ):
-    """Run the generalised Remez algorithm to find the optimal spline approximation of f.
-    Optionally, fixed values can be specified for the left and right tails."""
+    """Run the generalised Remez algorithm (GRA) to find the optimal spline approximation of f.
+    Optionally, fixed values can be specified for the left and right tails to run the GRAFT algorithm.
+    """
 
     fixed_left_tail = fixed_left_value is not None
     fixed_right_tail = fixed_right_value is not None

@@ -18,6 +18,7 @@ POINT_COLOR = "black"
 
 
 def _flatten_points(points):
+    """Flatten a list of points into a single array."""
     if points is None or len(points) == 0:
         return []
 
@@ -28,6 +29,7 @@ def _flatten_points(points):
 
 
 def _plot_function(ax, approx, label, n_samples=1000):
+    """Plot the original function f."""
     a, b = approx.interval
     t = np.linspace(a, b, n_samples)
 
@@ -155,6 +157,7 @@ def plot_duo(
     title=None,
     file_name=None,
 ):
+    """Plot two subplots: the function and its approximation, and the deviation."""
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7))
 
     # Functions
@@ -205,6 +208,7 @@ def plot_report(
     file_name=None,
     figsize=(7, 5),
 ):
+    """Plot a single figure with the function, approximation, and deviation. Report-style plot."""
     fig, ax = plt.subplots(figsize=figsize)
 
     _plot_function(ax, approx, f_label)

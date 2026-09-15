@@ -1,5 +1,6 @@
 # extensions - subgradients and simplex system
 import numpy as np
+from qpsolvers import solve_qp
 
 import nadia_original
 import test_functions
