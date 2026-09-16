@@ -115,17 +115,15 @@ if __name__ == "__main__":
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
     a, b = -1, 1
-    k = 7
-    m = 1
+    k = 5
+    m = 2
 
     approx = run(f, a, b, k, m)
 
-    plotting.plot_duo(
+    plotting.plot_report(
         approx,
         points=approx.basis,
         f_label=f_label,
-        approximation_label="Piecewise polynomial approximation",
-        points_label="Alternance points",
-        title=f"Degree-{m} approximation with {len(approx.g.knots) - 2} free knots.",
+        approximation_label=rf"$S_{{{m},{k}}}(t)$",
         file_name=f"nberger_{function_name}_a{a}_b{b}_k{k}_m{m}.png",
     )

@@ -1,6 +1,10 @@
 import numpy as np
 
 
+def f_cos(t):
+    return np.cos(t)
+
+
 def f_sin(t):
     return np.sin(t)
 
@@ -56,6 +60,7 @@ def f_g(t):
 
 
 TEST_FUNCTIONS = {
+    "cos": (f_cos, r"$\cos(t)$"),
     "sin": (f_sin, r"$\sin(t)$"),
     "sin3t": (f_sin_3t, r"$\sin(3t)$"),
     "log": (f_log, r"$\log(t+1)$"),

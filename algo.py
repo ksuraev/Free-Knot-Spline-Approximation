@@ -199,7 +199,6 @@ def find_optimal_theta(
     m,
     n,
     x_min,
-    x_max,
     h=0.1,
     rho=0.5,
     c=0.1,
@@ -308,15 +307,13 @@ if __name__ == "__main__":
     m = 1
 
     # TODO: unused x_max
-    approx, x_min, x_max = nurnberger_mod.discontinuous_spline(f, a, b, k, m)
+    approx, x_min = nurnberger_mod.discontinuous_spline(f, a, b, k, m)
 
     if x_min is None:
         x_min = approx.g.knots[1]
 
     # Find optimal theta
-    theta_opt, psi_result = find_optimal_theta(
-        f, a, b, m, n, x_min, x_max, verbose=True
-    )
+    theta_opt, psi_result = find_optimal_theta(f, a, b, m, n, x_min, verbose=True)
 
     def case(case_num):
         if case_num == 1:
@@ -336,7 +333,7 @@ if __name__ == "__main__":
         psi_result["approximation"],
         points=psi_result["approximation"].basis,
         f_label=f_label,
-        approximation_label=rf"$S_{{{m}}}(t)$",
+        approximation_label=rf"$S_{{{m},{k}}}(t)$",
         title=(
             f"Degree-{m} spline approximation of {f_label}. "
             f"{k} internal knots ({status}). "

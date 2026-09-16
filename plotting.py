@@ -4,27 +4,27 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
+import Spline
+
 date = datetime.now().strftime("%Y-%m-%d")
 
 plot_dir = Path("plots") / date
 plot_dir.mkdir(parents=True, exist_ok=True)
 
 
-FUNCTION_COLOR = "slategray"
-APPROXIMATION_COLOR = "cornflowerblue"
-DEVIATION_COLOR = "darkslategray"
-KNOT_COLOR = "crimson"
-POINT_COLOR = "black"
+FUNCTION_COLOUR = "slategray"
+APPROX_COLOUR = "cornflowerblue"
+DEVIATION_COLOUR = "slategray"
+KNOT_COLOUR = "lightsteelblue"
+POINT_COLOUR = "black"
 
 
 def _flatten_points(points):
     """Flatten a list of points into a single array."""
     if points is None or len(points) == 0:
         return []
-
     if np.isscalar(points[0]):
         return np.asarray(points)
-
     return np.concatenate([np.asarray(p) for p in points])
 
 
@@ -33,32 +33,32 @@ def _plot_function(ax, approx, label, n_samples=1000):
     a, b = approx.interval
     t = np.linspace(a, b, n_samples)
 
-    ax.plot(t, approx.f(t), color=FUNCTION_COLOR, label=label)
+    ax.plot(t, approx.f(t), color=FUNCTION_COLOUR, label=label)
 
 
-def _plot_approximation(ax, approx, label, n_samples=1000):
-    """Plot the approximating polynomial or spline."""
+def _plot_approximation(ax, approx, label):
+    g = approx.g
 
-    # Spline: plot each piece separately
-    if hasattr(approx.g, "knots"):
-        knots = approx.g.knots
+    if isinstance(g, Spline.SUSpline):
+        # Continuous spline: evaluate the full spline
+        t = np.linspace(*approx.interval, 1000)
+        y = np.array([g(x) for x in t])
 
-        for i in range(approx.g.nintervals()):
-            t = np.linspace(knots[i], knots[i + 1], n_samples)
+        ax.plot(t, y, color=APPROX_COLOUR, label=label, zorder=2)
+
+    elif isinstance(g, Spline.Spline):
+        # Discontinuous piecewise spline: plot each piece separately
+        for i in range(g.nintervals()):
+            t = np.linspace(g.knots[i], g.knots[i + 1], 300)
+            y = g.polynomials[i](t)
 
             ax.plot(
-                t,
-                [approx.g(x) for x in t],
-                color=APPROXIMATION_COLOR,
-                label=label if i == 0 else None,
+                t, y, color=APPROX_COLOUR, label=label if i == 0 else None, zorder=2
             )
-
-    # Polynomial
     else:
-        a, b = approx.interval
-        t = np.linspace(a, b, n_samples)
-
-        ax.plot(t, approx.g(t), color=APPROXIMATION_COLOR, label=label)
+        # Polynomial
+        t = np.linspace(*approx.interval, 1000)
+        ax.plot(t, g(t), color=APPROX_COLOUR, label=label, zorder=2)
 
 
 def _plot_deviation_curve(ax, approx, n_samples=1000):
@@ -69,83 +69,144 @@ def _plot_deviation_curve(ax, approx, n_samples=1000):
 
         for i in range(approx.g.nintervals()):
             t = np.linspace(knots[i], knots[i + 1], n_samples)
-
             d = np.array([approx.deviation(x) for x in t])
 
             ax.plot(
-                t,
-                d,
-                color=DEVIATION_COLOR,
-                label=r"$f(t)-S(t)$" if i == 0 else None,
+                t, d, color=DEVIATION_COLOUR, label=r"$f(t)-S(t)$" if i == 0 else None
             )
 
     else:
         a, b = approx.interval
         t = np.linspace(a, b, n_samples)
-
         d = np.array([approx.deviation(x) for x in t])
-
-        ax.plot(t, d, color=DEVIATION_COLOR, label=r"$f(t)-P(t)$")
+        ax.plot(t, d, color=DEVIATION_COLOUR, label=r"$f(t)-P(t)$")
 
     ax.axhline(0, color="black", lw=0.5)
 
 
-def _plot_knots(ax, approx, label="Knots"):
+def _plot_knots(ax, approx):
     """Plot spline knots, if the approximation is a spline."""
 
     if not hasattr(approx.g, "knots"):
         return
 
-    for j, knot in enumerate(approx.g.knots):
+    # lines
+    for knot in approx.g.knots[1:-1]:
         ax.axvline(
             knot,
-            color=KNOT_COLOR,
-            lw=0.8,
-            linestyle="-",
-            label=label if j == 0 else None,
+            linewidth=0.7,
+            zorder=0,
+            color=KNOT_COLOUR,
         )
+    # ticks
+    # ymin, ymax = ax.get_ylim()
+    # tick_height = 0.04 * (ymax - ymin)
+
+    # for knot in approx.g.knots[1:-1]:
+    #     ax.plot(
+    #         [knot, knot],
+    #         [ymin, ymin + tick_height],
+    #         linewidth=1,
+    #         zorder=1,
+    #         color=KNOT_COLOUR,
+    #     )
+    # # markers
+    # for knot in approx.g.knots[1:-1]:
+    #     ax.scatter(
+    #         knot,
+    #         0,
+    #         marker="|",
+    #         s=80,
+    #         zorder=4,
+    #         color=KNOT_COLOUR,
+    #     )
 
 
-def _plot_basis_lines(ax, points, label="Basis points"):
-    points = _flatten_points(points)
+def _plot_basis_lines(ax, approx, label="Basis points"):
+    basis_points = _flatten_points(approx.basis)
 
-    for j, point in enumerate(points):
-        ax.axvline(
-            point,
-            linestyle=":",
-            color=POINT_COLOR,
-            label=label if j == 0 else None,
-        )
+    for point in basis_points:
+        y_dev = approx.deviation(point)
 
+        # point on the x-axis
+        ax.scatter(point, 0, color="black", s=15, zorder=5)
 
-def _plot_deviation_markers(ax, approx, points, label="Alternance points"):
-    """Plot approximation points and their deviations from f."""
-
-    points = _flatten_points(points)
-
-    for j, point in enumerate(points):
-        y_approx = approx.g(point)
-        y_f = approx.f(point)
-
-        # Point on approximation.
-        ax.scatter(
-            point,
-            y_approx,
-            color=POINT_COLOR,
-            s=20,
-            zorder=5,
-            label=label if j == 0 else None,
-        )
-
-        # Vertical deviation.
+        # dashed connector
         ax.plot(
             [point, point],
-            [y_approx, y_f],
-            color=POINT_COLOR,
+            [0, y_dev],
+            color="black",
             linestyle="--",
             linewidth=1,
             alpha=0.8,
         )
+
+
+def _plot_deviation_markers(ax, approx, points, label="Alternance points"):
+    """Plot function points and their deviations from the approximation."""
+
+    j = 0
+
+    # Discontinuous spline
+    if isinstance(approx.g, Spline.Spline) and not isinstance(
+        approx.g, Spline.SUSpline
+    ):
+        for i, interval_points in enumerate(points):
+            P = approx.g.polynomials[i]
+
+            for point in interval_points:
+                y_approx = P(point)
+                y_f = approx.f(point)
+
+                # Point on the function.
+                ax.scatter(
+                    point,
+                    y_f,
+                    color=POINT_COLOUR,
+                    s=15,
+                    zorder=5,
+                    label=label if j == 0 else None,
+                )
+
+                # Vertical deviation.
+                ax.plot(
+                    [point, point],
+                    [y_approx, y_f],
+                    color=POINT_COLOUR,
+                    linestyle="--",
+                    linewidth=1,
+                    alpha=0.8,
+                )
+
+                j += 1
+
+    # Continuous spline (GRA) or polynomial (Remez)
+    else:
+        points = _flatten_points(points)
+
+        for j, point in enumerate(points):
+            y_approx = approx.g(point)
+            y_f = approx.f(point)
+
+            # Point on the function.
+            ax.scatter(
+                point,
+                y_f,
+                color=POINT_COLOUR,
+                s=15,
+                zorder=5,
+                label=label if j == 0 else None,
+            )
+
+            # Vertical deviation.
+            ax.plot(
+                [point, point],
+                [y_approx, y_f],
+                color=POINT_COLOUR,
+                linestyle="--",
+                linewidth=1,
+                alpha=0.8,
+            )
 
 
 def plot_duo(
@@ -174,7 +235,7 @@ def plot_duo(
     # Basis / alternance points
     if points is not None:
         _plot_deviation_markers(ax1, approx, points, label=points_label)
-        _plot_basis_lines(ax2, points, label=points_label)
+        _plot_basis_lines(ax2, approx, label=points_label)
 
     ax1.set_xlabel("t")
     ax1.set_title("Approximation")
@@ -184,8 +245,17 @@ def plot_duo(
     ax2.set_title("Deviation")
 
     ax1.legend(loc="lower center", bbox_to_anchor=(0.5, -0.3))
-
     ax2.legend(loc="lower center", bbox_to_anchor=(0.5, -0.3))
+
+    ax1.spines["top"].set_visible(False)
+    ax1.spines["right"].set_visible(False)
+    ax2.spines["top"].set_visible(False)
+    ax2.spines["right"].set_visible(False)
+
+    for spine in ax1.spines.values():
+        spine.set_linewidth(0.6)
+    for spine in ax2.spines.values():
+        spine.set_linewidth(0.6)
 
     if title is not None:
         fig.suptitle(title)
@@ -212,10 +282,8 @@ def plot_report(
     fig, ax = plt.subplots(figsize=figsize)
 
     _plot_function(ax, approx, f_label)
-
-    _plot_approximation(ax, approx, approximation_label)
-
     _plot_knots(ax, approx)
+    _plot_approximation(ax, approx, approximation_label)
 
     if points is not None:
         _plot_deviation_markers(ax, approx, points, label=points_label)
@@ -233,7 +301,14 @@ def plot_report(
 
     ax.tick_params(axis="both", which="major", labelsize=14)
 
-    ax.legend(fontsize=15, frameon=False, loc="best")
+    ax.legend(
+        fontsize=15,
+        loc="best",
+        frameon=True,
+        framealpha=1.0,
+        facecolor="white",
+        edgecolor="none",
+    )
 
     fig.tight_layout()
 

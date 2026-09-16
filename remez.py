@@ -109,11 +109,11 @@ def remez(f, a, b, m, max_iter=10000, verbose=False):
 
 
 if __name__ == "__main__":
-    function_name = "f_g"
+    function_name = "g"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
     a, b = -1, 1
-    m = 40
+    m = 12
 
     approx = remez(f, a, b, m)
 
@@ -122,6 +122,5 @@ if __name__ == "__main__":
         points=approx.basis,
         f_label=f_label,
         approximation_label=rf"$P_{{{m}}}(t)$",
-        points_label="",
         file_name=f"remez_report_{function_name}_m{m}.png",
     )
