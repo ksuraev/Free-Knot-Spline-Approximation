@@ -86,40 +86,10 @@ def _plot_deviation_curve(ax, approx, n_samples=1000):
 
 def _plot_knots(ax, approx):
     """Plot spline knots, if the approximation is a spline."""
-
     if not hasattr(approx.g, "knots"):
         return
-
-    # lines
     for knot in approx.g.knots[1:-1]:
-        ax.axvline(
-            knot,
-            linewidth=0.7,
-            zorder=0,
-            color=KNOT_COLOUR,
-        )
-    # ticks
-    # ymin, ymax = ax.get_ylim()
-    # tick_height = 0.04 * (ymax - ymin)
-
-    # for knot in approx.g.knots[1:-1]:
-    #     ax.plot(
-    #         [knot, knot],
-    #         [ymin, ymin + tick_height],
-    #         linewidth=1,
-    #         zorder=1,
-    #         color=KNOT_COLOUR,
-    #     )
-    # # markers
-    # for knot in approx.g.knots[1:-1]:
-    #     ax.scatter(
-    #         knot,
-    #         0,
-    #         marker="|",
-    #         s=80,
-    #         zorder=4,
-    #         color=KNOT_COLOUR,
-    #     )
+        ax.axvline(knot, linewidth=0.7, zorder=0, color=KNOT_COLOUR)
 
 
 def _plot_basis_lines(ax, approx, label="Basis points"):
@@ -158,7 +128,7 @@ def _plot_deviation_markers(ax, approx, points, label="Alternance points"):
                 y_approx = P(point)
                 y_f = approx.f(point)
 
-                # Point on the function.
+                # Point on the function
                 ax.scatter(
                     point,
                     y_f,
@@ -168,7 +138,7 @@ def _plot_deviation_markers(ax, approx, points, label="Alternance points"):
                     label=label if j == 0 else None,
                 )
 
-                # Vertical deviation.
+                # Vertical deviation
                 ax.plot(
                     [point, point],
                     [y_approx, y_f],

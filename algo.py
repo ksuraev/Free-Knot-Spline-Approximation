@@ -183,7 +183,7 @@ def armijo(f, a, b, theta, psi_theta, m, n, g, d, rho=0.5, c=0.1, verbose=False)
             )
 
         # Check the Armijo condition
-        if psi_next <= psi_theta + c * alpha * g:
+        if psi_next <= psi_theta + c * alpha * abs(d) * g:
             return theta_next
 
         # If the Armijo condition is not satisfied, reduce alpha and try again
@@ -210,7 +210,7 @@ def find_optimal_theta(
     theta = x_min
 
     for k in range(max_iter):
-        # Compute the directional derivatives at the current theta
+        # Compute the approximate directional derivatives at the current theta
         psi_theta = psi(f, a, b, theta, m, n, verbose=verbose)["d_max"]
         g_plus = directional_derivative(f, a, b, theta, psi_theta, m, n, h)
         g_minus = directional_derivative(f, a, b, theta, psi_theta, m, n, -h)

@@ -352,16 +352,17 @@ def gra(
 
 
 if __name__ == "__main__":
-    function_name = "f_g"
+    function_name = "g"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
     a, b = -1, 1
-    k = 7  # number of internal fixed knots
+    k = 3  # number of internal fixed knots
     m = 1  # degree of polynomial to fit in each subinterval
     n = k + 1  # number of subintervals
 
     # Choose initial knots
-    knots = np.array([-1, -5 / 6, -1 / 2, -1 / 6, 0, 1 / 6, 1 / 2, 5 / 6, 1])
+    # knots = np.array([-1, -5 / 6, -1 / 2, -1 / 6, 0, 1 / 6, 1 / 2, 5 / 6, 1])
+    knots = np.linspace(a, b, k + 2)
 
     result = gra(f, knots, m, n, exchange_function=exchange, verbose=True)
 
