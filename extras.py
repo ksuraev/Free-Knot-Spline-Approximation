@@ -4,6 +4,7 @@ import pulp as pl
 from qpsolvers import solve_qp
 
 import nadia_original
+import nurnberger_mod
 import Spline
 import test_functions
 
@@ -52,7 +53,8 @@ def build_simplex_system(f, samples, knots, m):
     return A, b
 
 
-def solve_simplex(f, samples, knots, m):
+def solve_simplex(f, knots, m):
+    samples = np.linspace(knots[0], knots[-1], 1000)
     A, b = build_simplex_system(f, samples, knots, m)
 
     # Objective function: minimise the last variable (the deviation)
@@ -73,7 +75,7 @@ def solve_simplex(f, samples, knots, m):
         constraint = pl.lpSum(A[i, j] * x[j] for j in range(A.shape[1])) - z <= b[i]
         prob += constraint
 
-    solver = pl.HiGHS_CMD(msg=True)
+    solver = pl.HiGHS_CMD(msg=False)
     prob.solve(solver)
 
     # Extract the solution for the coefficients
@@ -89,6 +91,67 @@ def solve_simplex(f, samples, knots, m):
     return S, z.varValue
 
 
+def armijo(f, S, knots, m, d, rho=0.5, c=0.1, verbose=False):
+    """Armijo line search to find the next theta in the direction of d."""
+    # Initialise the step size
+    alpha = 10.0
+    d_full = np.concatenate([[0], d, [0]])
+
+    curr_knots = knots.copy()
+    psi_theta = solve_simplex(f, curr_knots, m)[1]
+
+    while alpha > 1e-8:
+        # Compute the next knots using the step size alpha
+        next_knots = curr_knots + alpha * d_full
+
+        # Check if theta_next is within the interval [a, b]
+        # I really believe this is right rather than looping here with while
+        if np.any(next_knots[:-1] >= next_knots[1:]):
+            alpha *= rho
+            continue
+
+        psi_next = solve_simplex(f, next_knots, m)[1]
+        print(
+            f"alpha: {alpha:.5f}, psi_next: {psi_next:.5f}, psi_theta: {psi_theta:.5f}"
+        )
+        # Check the Armijo condition
+        if psi_next <= psi_theta + c * alpha * np.linalg.norm(d):
+            return next_knots
+
+        # If the Armijo condition is not satisfied, reduce alpha and try again
+        alpha *= rho
+
+    return curr_knots
+
+
+def get_direction(f, knots, m):
+    # eval Psi
+    S, deviation = solve_simplex(f, knots, m)
+    approx = Spline.Approximation(f, S, (a, b), basis=None)
+
+    all_pts = approx.maxdeviationpoints()
+    basis = [t for [t, d] in all_pts]
+    signs = [np.sign(d) for [t, d] in all_pts]
+
+    d = find_descent_direction(basis, S, signs)
+    return d, S
+
+
+def descent_algo(x_min, f, a, b, m, k):
+    knots = np.linspace(a, x_min, k + 1)
+    knots = np.concatenate([knots, [b]])
+
+    for iteration in range(100):
+        d, S = get_direction(f, knots, m)
+
+        print(f"Iteration {iteration}: {np.linalg.norm(d):.5f}")
+        if np.linalg.norm(d) < 1e-5:
+            break
+        knots = armijo(f, S, knots, m, d)
+
+    return knots, S, iteration
+
+
 if __name__ == "__main__":
     function_name = "f_g"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
@@ -97,14 +160,15 @@ if __name__ == "__main__":
     k = 5
     m = 2
 
-    samples = np.linspace(a, b, 1000)
-    knots = np.linspace(a, b, k + 2)
+    approx, x_min = nurnberger_mod.discontinuous_spline(f, a, b, k, m)
+    print(f"x_min: {x_min}")
+    if x_min is None:
+        x_min = approx.g.knots[1]
 
-    S, deviation = solve_simplex(f, samples, knots, m)
+    new_knots, S, iteration = descent_algo(x_min, f, a, b, m, k)
+    print(f"Descent algorithm completed in {iteration} iterations.")
     approx = Spline.Approximation(f, S, (a, b), basis=None)
-    all_pts = approx.maxdeviationpoints()
-    basis = [t for [t, d] in all_pts]
-    signs = [np.sign(d) for [t, d] in all_pts]
-
-    d = find_descent_direction(basis, S, signs)
-    print("Descent direction:", d)
+    approx.plot_functions(
+        "plot",
+        "descent_algo.png",
+    )
