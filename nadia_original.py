@@ -21,13 +21,13 @@ def step_zero(knots, m, n, fixed_left_tail=False, fixed_right_tail=False):
         start = knots[i]
         end = knots[i + 1]
 
-        pts = m + 1 if (i == 0 or i == n - 1) else m
-        # if i == 0:
-        #     pts = m if fixed_left_tail else m + 1
-        # elif i == n - 1:
-        #     pts = m if fixed_right_tail else m + 1
-        # else:
-        #     pts = m
+        # pts = m + 1 if (i == 0 or i == n - 1) else m
+        if i == 0:
+            pts = m if fixed_left_tail else m + 1
+        elif i == n - 1:
+            pts = m if fixed_right_tail else m + 1
+        else:
+            pts = m
 
         local_basis = np.linspace(start, end, pts + 2)[1:-1]
         basis.append(local_basis)
