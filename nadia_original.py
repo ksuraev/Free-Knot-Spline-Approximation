@@ -88,30 +88,34 @@ def step_one(knots, basis, m, n, f, fixed_left_value=None, fixed_right_value=Non
     if fixed_right_value is not None:
         temp_basis.append(np.array([knots[-1]]))
 
-    basis_counts = [len(b) for b in temp_basis]
-    total_rows = sum(basis_counts)
+    # basis_counts = [len(b) for b in temp_basis]
+    b = f(np.concatenate(temp_basis))
+    total_rows = len(b)
 
     A = np.zeros((total_rows, total_rows))
-    b = np.zeros(total_rows)
+    # b = np.zeros(total_rows)
 
     # Build the matrix A
     A = np.concatenate(
         [
             np.ones((total_rows, 1)),
             build_P(np.concatenate(temp_basis), knots, m),
-            np.zeros((total_rows, 1)),
+            #-(-1*np.ones(A.shape[0]))**(range(A.shape[0])),
+            np.ones((total_rows, 1)),
         ],
         axis=1,
     )
 
     # Add the alternating signs for the last column of A
-    sign = -1
-    for r in range(A.shape[0]):
-        A[r, -1] = sign
-        sign *= -1
+    A[:, -1] = -(-1*np.ones(A.shape[0]))**(range(A.shape[0]))
+    #sign = -1
+    #for r in range(A.shape[0]):
+    #    A[r, -1] = sign
+    #    sign *= -1
 
     # Build the vector b
-    b = np.array([f(t) for b in temp_basis for t in b])
+    # b = np.array([f(t) for b in temp_basis for t in b])
+    # b = f(np.concatenate(temp_basis))
 
     # Fixed right value
     row = A.shape[0] - 1
@@ -327,8 +331,11 @@ def gra(
     exit_type = None
     exit_i_star, exit_t_star, exit_d_star = None, None, None
 
-    for _ in range(100):
+    for iter in range(100):
         i_star, t_star, d_star = approx.maxdeviation()
+        d_m = np.max(np.abs(approx.deviation(np.concat(basis))))
+        if iter%5 == 0:
+            print(f"{iter} iterations, t* = {t_star}, d* = {d_star}, dm={d_m}.")
 
         optimal, pts, signs, chain = check_exit_1(
             approx,
@@ -369,7 +376,8 @@ def gra(
         if exit_type == 1:
             print(f"EXIT 1: Spline is optimal. Chain: {chain}")
         print(f"Final max abs deviation: {abs(d_star):.5f} at t*={t_star:.5f}")
-        print(f"Final basis: {approx.basis}")
+        print(f"Final basis: {[len(b) for b in approx.basis]}")
+        # print(f"Final basis: {approx.basis}")
 
     return {
         "approximation": approx,
