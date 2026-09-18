@@ -114,16 +114,17 @@ if __name__ == "__main__":
 
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
-    a, b = -1, 1
-    k = 5
-    m = 2
+    a, b = 0, 12
+    k = 1
+    m = 1
 
     approx = run(f, a, b, k, m)
+    print(f"Final knots: {approx.g.knots}")
 
-    plotting.plot_report(
-        approx,
-        points=approx.basis,
-        f_label=f_label,
-        approximation_label=rf"$S_{{{m},{k}}}(t)$",
-        file_name=f"nberger_{function_name}_a{a}_b{b}_k{k}_m{m}.png",
-    )
+    # plotting.plot_report(
+    #     approx,
+    #     points=approx.basis,
+    #     f_label=f_label,
+    #     approximation_label=rf"$S_{{{m},{k}}}(t)$",
+    #     file_name=f"nberger_{function_name}_a{a}_b{b}_k{k}_m{m}.png",
+    # )

@@ -198,7 +198,7 @@ def find_optimal_theta(
     b,
     m,
     n,
-    x_min,
+    theta_min,
     h=0.1,
     rho=0.5,
     c=0.1,
@@ -207,7 +207,7 @@ def find_optimal_theta(
     verbose=False,
 ):
     """Find the optimal theta that minimises psi(theta) using directional derivatives and Armijo line search."""
-    theta = x_min
+    theta = theta_min
 
     for k in range(max_iter):
         # Compute the approximate directional derivatives at the current theta
@@ -255,105 +255,65 @@ def find_optimal_theta(
     return theta, psi_theta
 
 
-def plot_psi(
-    f, f_label, a, b, m, n, theta_start, theta_end, file_name, step=0.05, verbose=False
-):
-    """Plot the function psi(theta) over the interval [theta_start, theta_end]."""
-    thetas = np.arange(theta_start, theta_end, step)
-
-    psi_values = []
-
-    for theta in thetas:
-        result = psi(f, a, b, theta, m, n, verbose=verbose)["d_max"]
-        psi_values.append(result)
-
-    plt.figure(figsize=(8, 6))
-
-    plt.plot(thetas, psi_values)
-
-    psi_min = min(psi_values)
-    theta_min = thetas[np.argmin(psi_values)]
-
-    plt.axvline(
-        x=theta_min,
-        color="red",
-        linestyle="--",
-        lw=0.5,
-        label=rf"$\theta_{{\min}}={theta_min:.4f}$ with $\psi(\theta_{{\min}})={psi_min:.4f}$",
-    )
-
-    plt.xlabel(r"$\theta$")
-    plt.ylabel(r"$\psi(\theta)$")
-
-    plt.title(r"$\psi(\theta)$ for " + f"{f_label} with m={m}, k={k}")
-
-    plt.grid(alpha=0.3)
-    plt.legend(loc="lower center", bbox_to_anchor=(0.5, -0.3))
-    plt.tight_layout()
-
-    plt.savefig(file_name, dpi=300)
-    plt.show()
-
-
 if __name__ == "__main__":
-    function_name = "sin_weird"
+    function_name = "cos_weird"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
-    a = 0
-    b = 12
+    a, b = 0, 12
 
     k = 1
     n = k + 1
     m = 1
 
-    # TODO: unused x_max
-    approx, x_min = nurnberger_mod.discontinuous_spline(f, a, b, k, m)
+    approx, theta_min = nurnberger_mod.discontinuous_spline(f, a, b, k, m)
 
-    if x_min is None:
-        x_min = approx.g.knots[1]
+    print(f"theta_min: {theta_min}")
 
-    # Find optimal theta
-    theta_opt, psi_result = find_optimal_theta(f, a, b, m, n, x_min, verbose=True)
+    # if theta_min is None:
+    #     theta_min = approx.g.knots[1]
 
-    def case(case_num):
-        if case_num == 1:
-            return "two intervals"
-        elif case_num == 2:
-            return "fixed left"
-        elif case_num == 3:
-            return "fixed right"
+    # # Find optimal theta
+    # theta_opt, psi_result = find_optimal_theta(f, a, b, m, n, -0.5, verbose=True)
 
-    status = (
-        f"optimal, {case(psi_result['case'])}"
-        if psi_result["optimal"]
-        else f"not optimal, {case(psi_result['case'])}"
-    )
+    # def case(case_num):
+    #     if case_num == 1:
+    #         return "two intervals"
+    #     elif case_num == 2:
+    #         return "fixed left"
+    #     elif case_num == 3:
+    #         return "fixed right"
 
-    plotting.plot_duo(
-        psi_result["approximation"],
-        points=psi_result["approximation"].basis,
-        f_label=f_label,
-        approximation_label=rf"$S_{{{m},{k}}}(t)$",
-        title=(
-            f"Degree-{m} spline approximation of {f_label}. "
-            f"{k} internal knots ({status}). "
-            f"Max abs deviation: {psi_result['d_max']:.5f}."
-        ),
-        file_name=f"duo_alg_{function_name}_k{k}_m{m}.png",
-    )
-
-    # psi plot with swap
-    # start_theta = a + 0.1
-    # end_theta = b - 0.1
-
-    # plot_psi(
-    #     f,
-    #     f_label,
-    #     a,
-    #     b,
-    #     m,
-    #     n,
-    #     start_theta,
-    #     end_theta,
-    #     f"PSI_{function_name}_a{a}_b{b}_s{start_theta}_e{end_theta}_k{k}_m{m}_with_swap.png",
+    # status = (
+    #     f"optimal, {case(psi_result['case'])}"
+    #     if psi_result["optimal"]
+    #     else f"not optimal, {case(psi_result['case'])}"
     # )
+
+    # plotting.plot_duo(
+    #     psi_result["approximation"],
+    #     points=psi_result["approximation"].basis,
+    #     f_label=f_label,
+    #     approximation_label=rf"$S_{{{m},{k}}}(t)$",
+    #     title=(
+    #         f"Degree-{m} spline approximation of {f_label}. "
+    #         f"{k} internal knots ({status}). "
+    #         f"Max abs deviation: {psi_result['d_max']:.5f}."
+    #     ),
+    #     file_name=f"duo_alg_{function_name}_k{k}_m{m}",
+    # )
+
+    # Plot psi(theta) over the interval [a + 0.1, b - 0.1]
+    start_theta = a + 0.1
+    end_theta = b - 0.1
+    plotting.plot_objective_psi(
+        f,
+        a,
+        b,
+        m,
+        n,
+        start_theta,
+        end_theta,
+        psi_function=psi,
+        file_name=f"PSI_{function_name}_a{a}_b{b}_k{k}_m{m}",
+        step=0.01,
+    )

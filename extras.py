@@ -5,6 +5,7 @@ from qpsolvers import solve_qp
 
 import nadia_original
 import nurnberger_mod
+import plotting
 import Spline
 import test_functions
 
@@ -78,7 +79,7 @@ def solve_simplex(f, knots, m):
     solver = pl.HiGHS_CMD(msg=False)
     prob.solve(solver)
 
-    # Extract the solution for the coefficients
+    # Extract the solution for the coefficients and the deviation
     r = np.array([x[j].varValue for j in range(A.shape[1])])
     a = np.concatenate([r[1:].reshape(len(knots) - 1, m)])
     coeffs = [np.concatenate([[0], c]) for c in a]
@@ -89,6 +90,14 @@ def solve_simplex(f, knots, m):
     S = Spline.SUSpline(knots, polynomials)
 
     return S, z.varValue
+
+
+def directional_derivative(f, knots, m, d, h=0.01):
+    d_full = np.concatenate([[0], d, [0]])
+    psi_theta = solve_simplex(f, knots, m)[1]
+    psi_new = solve_simplex(f, knots + h * d_full, m)[1]
+
+    return (psi_new - psi_theta) / (np.linalg.norm(d_full))
 
 
 def armijo(f, S, knots, m, d, rho=0.5, c=0.1, verbose=False):
@@ -111,9 +120,9 @@ def armijo(f, S, knots, m, d, rho=0.5, c=0.1, verbose=False):
             continue
 
         psi_next = solve_simplex(f, next_knots, m)[1]
-        print(
-            f"alpha: {alpha:.5f}, psi_next: {psi_next:.5f}, psi_theta: {psi_theta:.5f}"
-        )
+        # print(
+        #     f"alpha: {alpha:.5f}, psi_next: {psi_next:.5f}, psi_theta: {psi_theta:.5f}"
+        # )
         # Check the Armijo condition
         if psi_next <= psi_theta + c * alpha * np.linalg.norm(d):
             return next_knots
@@ -143,8 +152,9 @@ def descent_algo(x_min, f, a, b, m, k):
 
     for iteration in range(100):
         d, S = get_direction(f, knots, m)
-
-        print(f"Iteration {iteration}: {np.linalg.norm(d):.5f}")
+        directional_deriv = directional_derivative(f, knots, m, d)
+        print(f"{iteration}: directional derivative = {directional_deriv:.5f}")
+        print(f"{iteration}: norm d = {np.linalg.norm(d):.5f}")
         if np.linalg.norm(d) < 1e-5:
             break
         knots = armijo(f, S, knots, m, d)
@@ -168,7 +178,8 @@ if __name__ == "__main__":
     new_knots, S, iteration = descent_algo(x_min, f, a, b, m, k)
     print(f"Descent algorithm completed in {iteration} iterations.")
     approx = Spline.Approximation(f, S, (a, b), basis=None)
-    approx.plot_functions(
-        "plot",
-        "descent_algo.png",
+    plotting.plot_duo(
+        approx,
+        title=f"Descent algorithm for {f_label} with {k} internal knots and degree {m}",
+        file_name=f"descent_{function_name}_k{k}_m{m}",
     )

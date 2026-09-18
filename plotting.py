@@ -1,10 +1,27 @@
 from datetime import datetime
 from pathlib import Path
 
+import matplotlib as mpl
+
+mpl.use("pgf")
 import matplotlib.pyplot as plt
 import numpy as np
 
 import Spline
+
+pgf_preamble_string = "\n".join([r"\usepackage{amsmath}"])
+
+
+mpl.rcParams.update(
+    {
+        "font.family": "serif",
+        "text.usetex": True,
+        "pgf.rcfonts": False,
+        "pgf.texsystem": "pdflatex",
+        "pgf.preamble": pgf_preamble_string,
+    }
+)
+
 
 date = datetime.now().strftime("%Y-%m-%d")
 
@@ -233,9 +250,13 @@ def plot_duo(
     fig.tight_layout()
 
     if file_name is not None:
-        fig.savefig(plot_dir / file_name, dpi=300, bbox_inches="tight")
-
-    plt.show()
+        fig.savefig((plot_dir / file_name).with_suffix(".pgf"), bbox_inches="tight")
+        fig.savefig(
+            (plot_dir / file_name).with_suffix(".pdf"),
+            dpi=300,
+            bbox_inches="tight",
+            format="pdf",
+        )
 
 
 def plot_report(
@@ -258,7 +279,7 @@ def plot_report(
     if points is not None:
         _plot_deviation_markers(ax, approx, points, label=points_label)
 
-    ax.set_xlabel(r"$t$")
+    ax.set_xlabel(r"$t$", fontsize=15)
 
     if title is not None:
         ax.set_title(title)
@@ -269,10 +290,10 @@ def plot_report(
     for spine in ax.spines.values():
         spine.set_linewidth(0.6)
 
-    ax.tick_params(axis="both", which="major", labelsize=14)
+    ax.tick_params(axis="both", which="major", labelsize=15)
 
     ax.legend(
-        fontsize=15,
+        fontsize=16,
         loc="best",
         frameon=True,
         framealpha=1.0,
@@ -283,6 +304,86 @@ def plot_report(
     fig.tight_layout()
 
     if file_name is not None:
-        fig.savefig(plot_dir / file_name, dpi=300, bbox_inches="tight")
+        fig.savefig((plot_dir / file_name).with_suffix(".pgf"), bbox_inches="tight")
+        fig.savefig(
+            (plot_dir / file_name).with_suffix(".pdf"),
+            dpi=300,
+            bbox_inches="tight",
+            format="pdf",
+        )
 
-    plt.show()
+
+def plot_objective_psi(
+    f,
+    a,
+    b,
+    m,
+    n,
+    theta_start,
+    theta_end,
+    psi_function,
+    file_name=None,
+    step=0.05,
+    figsize=(7, 5),
+    verbose=False,
+):
+    """Plot the objective function psi(theta) in same style as the report plots."""
+
+    thetas = np.arange(theta_start, theta_end, step)
+    psi_values = np.array(
+        [
+            psi_function(f, a, b, theta, m, n, verbose=verbose)["d_max"]
+            for theta in thetas
+        ]
+    )
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    ax.plot(
+        thetas, psi_values, color=APPROX_COLOUR, linewidth=1.5, label=r"$\psi(\theta)$"
+    )
+
+    min_index = np.argmin(psi_values)
+    theta_min = thetas[min_index]
+    psi_min = psi_values[min_index]
+
+    ax.scatter(
+        theta_min,
+        psi_min,
+        color=POINT_COLOUR,
+        s=20,
+        zorder=5,
+        label=rf"$\theta^*={theta_min:.3f}$",
+    )
+
+    ax.axvline(theta_min, color=KNOT_COLOUR, linewidth=0.7, zorder=0)
+
+    ax.set_xlabel(r"$\theta$", fontsize=15)
+    ax.set_ylabel(r"$\psi(\theta)$", fontsize=15)
+
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    for spine in ax.spines.values():
+        spine.set_linewidth(0.6)
+
+    ax.tick_params(axis="both", which="major", labelsize=15)
+
+    ax.legend(
+        fontsize=16,
+        loc="best",
+        frameon=True,
+        framealpha=1.0,
+        facecolor="white",
+        edgecolor="none",
+    )
+
+    fig.tight_layout()
+
+    if file_name is not None:
+        fig.savefig((plot_dir / file_name).with_suffix(".pgf"), bbox_inches="tight")
+        fig.savefig(
+            (plot_dir / file_name).with_suffix(".pdf"),
+            dpi=300,
+            bbox_inches="tight",
+            format="pdf",
+        )

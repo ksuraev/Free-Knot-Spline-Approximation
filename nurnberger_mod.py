@@ -43,8 +43,9 @@ def subroutine(f, x_i, b, m, d_n, max_iter):
 
         approx = approx_i
 
-    # x_min is the last alternance point in the interval [x_i, x_bar]
-    x_min = approx.basis[-1]
+    # x_min is the (m-2)nd alternance point in the interval [x_i, x_bar]
+    alt_pts, _ = approx.alternancesequence()
+    x_min = alt_pts[m + 1]
 
     return x_min
 
@@ -120,18 +121,19 @@ if __name__ == "__main__":
     function_name = "g"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
-    a, b = -1, 1
+    a, b = 0, 12
     k = 1  # number of free knots (not including a and b)
     m = 1  # degree of polynomial to fit
 
     approx, x_min = discontinuous_spline(f, a, b, k, m)
+    print(f"x_min: {x_min}")
 
-    plotting.plot_duo(
-        approx,
-        points=approx.basis,
-        f_label=f_label,
-        approximation_label="Piecewise polynomial approximation",
-        points_label="Alternance points",
-        title=f"Degree-{m} approximation with {len(approx.g.knots) - 2} free knot(s).",
-        file_name=f"nberger_mod_{function_name}_a{a}_b{b}_k{k}_m{m}.png",
-    )
+    # plotting.plot_duo(
+    #     approx,
+    #     points=approx.basis,
+    #     f_label=f_label,
+    #     approximation_label="Piecewise polynomial approximation",
+    #     points_label="Alternance points",
+    #     title=f"Degree-{m} approximation with {len(approx.g.knots) - 2} free knot(s).",
+    #     file_name=f"nberger_mod_{function_name}_a{a}_b{b}_k{k}_m{m}.png",
+    # )
