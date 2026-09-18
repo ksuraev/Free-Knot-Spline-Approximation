@@ -38,7 +38,10 @@ def find_descent_direction(basis, S, signs):
     b = np.ones(1)
     x = solve_qp(P, q, None, None, A, b, lb=q, solver="cvxopt")
 
-    return (-G @ x)[-len(S.knots) + 2 :]
+    return -G @ x
+
+
+# [-len(S.knots) + 2 :]
 
 
 def build_simplex_system(f, samples, knots, m):
@@ -92,12 +95,11 @@ def solve_simplex(f, knots, m):
     return S, z.varValue
 
 
-def directional_derivative(f, knots, m, d, h=0.01):
-    d_full = np.concatenate([[0], d, [0]])
+def directional_derivative(f, knots, m, d_full, h=0.0001):
     psi_theta = solve_simplex(f, knots, m)[1]
     psi_new = solve_simplex(f, knots + h * d_full, m)[1]
 
-    return (psi_new - psi_theta) / (np.linalg.norm(d_full))
+    return (psi_new - psi_theta) / (h * np.linalg.norm(d_full))
 
 
 def armijo(f, S, knots, m, d, rho=0.5, c=0.1, verbose=False):
@@ -105,7 +107,8 @@ def armijo(f, S, knots, m, d, rho=0.5, c=0.1, verbose=False):
     # Initialise the step size
     alpha = 10.0
     d_full = np.concatenate([[0], d, [0]])
-
+    directional_deriv = directional_derivative(f, knots, m, d_full)
+    print(f"Directional derivative: {directional_deriv:.5f}")
     curr_knots = knots.copy()
     psi_theta = solve_simplex(f, curr_knots, m)[1]
 
@@ -113,8 +116,7 @@ def armijo(f, S, knots, m, d, rho=0.5, c=0.1, verbose=False):
         # Compute the next knots using the step size alpha
         next_knots = curr_knots + alpha * d_full
 
-        # Check if theta_next is within the interval [a, b]
-        # I really believe this is right rather than looping here with while
+        # Check if the new knots are valid
         if np.any(next_knots[:-1] >= next_knots[1:]):
             alpha *= rho
             continue
@@ -123,8 +125,9 @@ def armijo(f, S, knots, m, d, rho=0.5, c=0.1, verbose=False):
         # print(
         #     f"alpha: {alpha:.5f}, psi_next: {psi_next:.5f}, psi_theta: {psi_theta:.5f}"
         # )
+
         # Check the Armijo condition
-        if psi_next <= psi_theta + c * alpha * np.linalg.norm(d):
+        if psi_next <= psi_theta + c * alpha * directional_deriv:
             return next_knots
 
         # If the Armijo condition is not satisfied, reduce alpha and try again
@@ -150,10 +153,10 @@ def descent_algo(x_min, f, a, b, m, k):
     knots = np.linspace(a, x_min, k + 1)
     knots = np.concatenate([knots, [b]])
 
-    for iteration in range(100):
+    for iteration in range(10):
         d, S = get_direction(f, knots, m)
-        directional_deriv = directional_derivative(f, knots, m, d)
-        print(f"{iteration}: directional derivative = {directional_deriv:.5f}")
+        # directional_deriv = directional_derivative(f, knots, m, d)
+        # print(f"{iteration}: directional derivative = {directional_deriv:.5f}")
         print(f"{iteration}: norm d = {np.linalg.norm(d):.5f}")
         if np.linalg.norm(d) < 1e-5:
             break
@@ -175,11 +178,38 @@ if __name__ == "__main__":
     if x_min is None:
         x_min = approx.g.knots[1]
 
-    new_knots, S, iteration = descent_algo(x_min, f, a, b, m, k)
-    print(f"Descent algorithm completed in {iteration} iterations.")
+    # new_knots, S, iteration = descent_algo(x_min, f, a, b, m, k)
+    new_knots = np.linspace(a, -0.5, k + 1)
+    new_knots = np.concatenate([new_knots, [b]])
+
+    S, z = solve_simplex(f, new_knots, m)
     approx = Spline.Approximation(f, S, (a, b), basis=None)
-    plotting.plot_duo(
-        approx,
-        title=f"Descent algorithm for {f_label} with {k} internal knots and degree {m}",
-        file_name=f"descent_{function_name}_k{k}_m{m}",
+    maxdev = approx.maxdeviation()
+    print(f"Max deviation: {maxdev[2]:.5f}")
+    basis = [t for [t, d] in approx.maxdeviationpoints()]
+    signs = [np.sign(d) for [t, d] in approx.maxdeviationpoints()]
+    G = find_descent_direction(basis, S, signs)
+    print(f"Descent direction: {G}")
+    h = 0.000001
+    newnewknots = new_knots + h * np.concatenate([[0], G[-len(new_knots) + 2 :], [0]])
+    a = np.concatenate([p.coef[1:] for p in S.polynomials])
+    # a = np.concatenate([S.polynomials[0].coef[0], a])
+    new_a = a + h * G[1 : -len(new_knots) + 2]
+    newnew_a = new_a.reshape(len(new_knots) - 1, m)
+    print(f"New coefficients: {newnew_a}")
+    newnew_a = [np.concatenate([[0], c]) for c in newnew_a]
+    newnew_a[0][0] = S.polynomials[0].coef[0] + h * G[0]
+    spline = Spline.SUSpline(
+        newnewknots,
+        [Spline.Polynomial(c, offset=x) for c, x in zip(newnew_a, newnewknots[:-1])],
     )
+    approx = Spline.Approximation(f, spline, (a, b), basis=None)
+    maxdev = approx.maxdeviation()
+    print(f"Max deviation: {maxdev[2]:.5f}")
+    # print(f"Descent algorithm completed in {iteration} iterations.")
+    # approx = Spline.Approximation(f, S, (a, b), basis=None)
+    # plotting.plot_duo(
+    #     approx,
+    #     title=f"Descent algorithm for {f_label} with {k} internal knots and degree {m}",
+    #     file_name=f"descent_{function_name}_k{k}_m{m}",
+    # )
