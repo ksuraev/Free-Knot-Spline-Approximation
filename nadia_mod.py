@@ -169,9 +169,9 @@ if __name__ == "__main__":
     function_name = "f_g"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
-    a, b = 0, 12
+    a, b = -1, 1
     k = 10  # number of internal fixed knots
-    k = 15  # number of internal fixed knots
+    k = 25  # number of internal fixed knots
     m = 3  # degree of polynomial to fit in each subinterval
     n = k + 1  # number of subintervals
 
