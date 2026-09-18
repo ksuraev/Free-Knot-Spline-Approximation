@@ -190,7 +190,7 @@ class Approximation:
         """Return the signed deviation f(t) - g(t)."""
         return self.f(t) - self.g(t)
 
-    def _extrema(self, n_samples=10000):
+    def _extrema(self, n_samples=1000):
         """Return local maxima of absolute deviation as (i, t, d)."""
         knots = self.g.knots if hasattr(self.g, "knots") else self.interval
         extrema = []
@@ -204,30 +204,39 @@ class Approximation:
             d = self.deviation(t)
             abs_d = np.abs(d)
 
-            indices = []
+            indices = np.where((abs_d[1:-1] >= abs_d[0:-2]) &
+                               (abs_d[1:-1] >= abs_d[2:]))[0]
 
             if abs_d[0] >= abs_d[1]:
-                indices.append(0)
-
-            indices.extend(
-                j
-                for j in range(1, len(t) - 1)
-                if abs_d[j] >= abs_d[j - 1] and abs_d[j] >= abs_d[j + 1]
-            )
+                indices = np.concat([[0], indices])
 
             if abs_d[-1] >= abs_d[-2]:
-                indices.append(len(t) - 1)
+                indices = np.concat([indices, [len(t) - 1]])
 
-            extrema.extend((i, t[j], d[j]) for j in indices)
+            extrema.extend(zip(i*np.ones(len(t), dtype=int), t[indices], d[indices]))
 
         return extrema
 
     def maxdeviation(self, n_samples=10000):
-        extrema = self._extrema(n_samples)
-
-        d_max = max(extrema, key=lambda x: abs(x[2]))
-
-        return d_max
+        a = self.interval[0]
+        b = self.interval[1]
+        sample = np.concat([np.linspace(a, b, n_samples)] + self.basis)
+        d_abs = np.abs(self.deviation(sample))
+        d_max = max(d_abs)
+        j_max = np.where(d_abs == d_max)[0][0]
+        t_max = sample[j_max]
+        # while b-a > 1e-10:
+        #     sample = np.linspace(a, b, n_samples)
+        #     d_abs = np.abs(self.deviation(sample))
+        #     d_max = max(d_abs)
+        #     j_max = np.where(d_abs == d_max)[0][0]
+        #     t_max = sample[j_max]
+        #     if j_max > 1:
+        #         a = sample[j_max-1]
+        #     if j_max < n_samples-1:
+        #         b = sample[j_max+1]
+        i_max = np.where(self.g.knots[:-1] <= t_max)[0][-1]
+        return (i_max, t_max, self.deviation(t_max))
 
     def maxdeviationpoints(self, tol=1e-5, n_samples=10000):
         """Return all points attaining the maximum absolute deviation."""
