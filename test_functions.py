@@ -82,3 +82,18 @@ TEST_FUNCTIONS = {
     "g": (g, r"$e^t(q(1.5t) + 2p(t) + 0.5q(0.5t))$"),
     "f_g": (f_g, r"$0.5(f(t) - g(t))$"),
 }
+
+INTERVALS = {
+    "cos": (0, 6),
+    "sin": (0, 6),
+    "sin3t": (0, 6),
+    "log": (0, 10),
+    "log_sin": (0, 10),
+    "sin_if_else": (0, 12),
+    "cos_if_else": (0, 12),
+    "cos_weird": (0, 12),
+    "sin_weird": (0, 12),
+    "exp_sin_cos": (6, 8),
+    "g": (-1, 1),
+    "f_g": (-1, 1),
+}
