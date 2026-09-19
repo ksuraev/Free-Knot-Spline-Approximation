@@ -57,7 +57,7 @@ if __name__ == "__main__":
                     theta_l = a + 0.1
                     theta_r = b - 0.1
                     thetas, psi_values = compute_psi_samples_1d(
-                        f, a, b, m, k + 1, theta_l, theta_r, step=0.01
+                        f, a, b, m, k + 1, theta_l, theta_r
                     )
                     np.savez(
                         f"psi_surface_{function}_k{k}_m{m}.npz",
@@ -66,15 +66,7 @@ if __name__ == "__main__":
                     )
                 else:
                     theta_1_values, theta_2_values, psi_values = compute_psi_samples_2d(
-                        f,
-                        a,
-                        b,
-                        m,
-                        a + 0.1,
-                        b - 0.1,
-                        a + 0.1,
-                        b - 0.1,
-                        step=0.05,
+                        f, a, b, m, a + 0.1, b - 0.1, a + 0.1, b - 0.1
                     )
                     np.savez(
                         f"psi_surface_{function}_k{k}_m{m}.npz",
