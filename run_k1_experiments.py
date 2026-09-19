@@ -1,0 +1,152 @@
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+from tqdm import tqdm
+
+import compute_psi_samples
+import nurnberger
+import nurnberger_mod
+import one_knot_approx
+import plotting
+import test_functions
+
+experiments = [
+    (function, k, m)
+    for function in test_functions.TEST_FUNCTIONS
+    for k in [1]
+    for m in range(1, 4)
+]
+
+results = []
+
+with tqdm(experiments, desc="Experiments", unit="case") as progress:
+    for function, k, m in progress:
+        progress.set_postfix(function=function, k=k, m=m)
+
+        f, f_label = test_functions.TEST_FUNCTIONS[function]
+        a, b = test_functions.INTERVALS[function]
+
+        # Compute initial spline approximation based on equidistant knots
+        initial_theta = (a + b) / 2
+        initial_result = one_knot_approx.psi(f, a, b, initial_theta, m, k + 1)
+        initial_approx = initial_result["approximation"]
+        initial_max_deviation = abs(initial_approx.maxdeviation()[2])
+        initial_d_max = initial_result["d_max"]
+        initial_alternance_points = initial_approx.alternancesequence()[0]
+        initial_status = initial_result["optimal"]
+        initial_case = initial_result["case"]
+
+        # Plot the initial spline approximation
+        plotting.plot_report(
+            initial_approx,
+            points=initial_alternance_points,
+            f_label=f_label,
+            approximation_label=rf"$S_{{{m},{k}}}(t)$",
+            file_name=f"{function}_k{k}_m{m}_initial",
+        )
+
+        # Compute initial discontinuous spline approximation and find starting theta
+        approx, theta_start = nurnberger_mod.discontinuous_spline(f, a, b, k, m)
+        if theta_start is None:
+            theta_start = approx.g.knots[1]
+
+        # Use precomputed psi(theta) values from the .npz file to get thetas and psi_values
+        npz_path = Path(f"psi_surface_{function}_k{k}_m{m}.npz")
+        if npz_path.exists():
+            data = np.load(npz_path)
+            thetas = data["theta_values"]
+            psi_values = data["psi_values"]
+
+        else:
+            thetas, psi_values = compute_psi_samples.compute_psi_samples_1d(
+                f, a, b, m, k + 1, a + 0.1, b - 0.1, step=0.01
+            )
+            np.savez(npz_path, theta_values=thetas, psi_values=psi_values)
+
+        # plot psi(theta)
+        theta_sample_min, psi_sample_min = plotting.plot_objective_psi(
+            thetas, psi_values, file_name=f"psi_{function}_k{k}_m{m}"
+        )
+
+        # Find optimal theta
+        theta_opt, result, iterations, theta_path = one_knot_approx.find_optimal_theta(
+            f, a, b, m, k + 1, theta_start
+        )
+        psi_opt = result["d_max"]
+
+        nurnberger_original = nurnberger.run(f, a, b, k, m).g.knots[1]
+        nurnberger_modified = theta_start
+
+        plotting.plot_objective_psi(
+            thetas,
+            psi_values,
+            nurnbergers_orig_point=nurnberger_original,
+            nurnbergers_mod_point=nurnberger_modified,
+            file_name=f"psi_{function}_k{k}_m{m}_nurnberger_points",
+        )
+
+        # Plot psi(theta) again, this time highlighting the optimal theta found by the algorithm
+        plotting.plot_objective_psi(
+            thetas,
+            psi_values,
+            theta_found=theta_opt,
+            psi_found=psi_opt,
+            file_name=f"psi_opt_{function}_k{k}_m{m}",
+        )
+
+        # Plot psi(theta) again, this time highlighting the optimal theta found by the algorithm and the path taken by the algorithm
+        plotting.plot_objective_psi(
+            thetas,
+            psi_values,
+            theta_found=theta_opt,
+            psi_found=psi_opt,
+            theta_path=theta_path,
+            file_name=f"psi_opt_path_{function}_k{k}_m{m}",
+        )
+
+        final_approx = result["approximation"]
+        final_basis = final_approx.basis
+        final_max_deviation = abs(final_approx.maxdeviation()[2])
+        final_alternance_points = final_approx.alternancesequence()
+        final_d_max = result["d_max"]
+        final_gra_d_max = result.get("gra_d_max", None)
+        final_status = result["optimal"]
+        final_case = result["case"]
+
+        # Plot the final spline approximation
+        plotting.plot_report(
+            result["approximation"],
+            points=final_alternance_points[0],
+            f_label=f_label,
+            approximation_label=rf"$S_{{{m},{k}}}(t)$",
+            file_name=f"{function}_k{k}_m{m}_final",
+        )
+
+        result = {
+            "function": function,
+            "m": m,
+            "k": k,
+            "initialstatus": initial_status,
+            "initialcase": initial_case,
+            "initialtheta": initial_theta,
+            "initialmaxdeviation": initial_max_deviation,
+            "initialdmax": initial_d_max,
+            "thetastart": theta_start,
+            "thetahat": theta_opt,
+            "psithetahat": psi_opt,
+            "thetasamplemin": theta_sample_min,
+            "psithetastar": psi_sample_min,
+            "finalstatus": final_status,
+            "finalcase": result["case"],
+            "finaldmax": final_d_max,
+            "finalgradmax": final_gra_d_max,
+            "finalmaxdeviation": final_max_deviation,
+            "iterations": iterations,
+        }
+        results.append(result)
+
+
+df = pd.DataFrame(results)
+
+df.to_csv("k1results.csv", index=False)
