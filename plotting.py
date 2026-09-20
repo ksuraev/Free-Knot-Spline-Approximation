@@ -98,7 +98,7 @@ def _plot_approximation(ax, approx, label):
         )
 
 
-def _plot_deviation_curve(ax, approx, n_samples=1000):
+def _plot_deviation_curve(ax, approx, n_samples=1000, deviation_label=r"$f(t)-S(t)$"):
     """Plot the signed deviation f(t) - g(t)."""
 
     if hasattr(approx.g, "knots"):
@@ -109,14 +109,14 @@ def _plot_deviation_curve(ax, approx, n_samples=1000):
             d = np.array([approx.deviation(x) for x in t])
 
             ax.plot(
-                t, d, color=DEVIATION_COLOUR, label=r"$f(t)-S(t)$" if i == 0 else None
+                t, d, color=DEVIATION_COLOUR, label=deviation_label if i == 0 else None
             )
 
     else:
         a, b = approx.interval
         t = np.linspace(a, b, n_samples)
         d = np.array([approx.deviation(x) for x in t])
-        ax.plot(t, d, color=DEVIATION_COLOUR, label=r"$f(t)-P(t)$")
+        ax.plot(t, d, color=DEVIATION_COLOUR, label=deviation_label)
 
     ax.axhline(0, color="black", lw=0.5)
 
@@ -149,7 +149,7 @@ def _plot_basis_lines(ax, approx):
         )
 
 
-def _plot_deviation_markers(ax, approx, points, label="Alternance points"):
+def _plot_deviation_markers(ax, approx, points):
     """Plot function points and their deviations from the approximation."""
 
     j = 0
@@ -176,14 +176,7 @@ def _plot_deviation_markers(ax, approx, points, label="Alternance points"):
                 y_f = approx.f(point)
 
                 # Point on the function
-                ax.scatter(
-                    point,
-                    y_f,
-                    color=POINT_COLOUR,
-                    s=15,
-                    zorder=5,
-                    label=label if j == 0 else None,
-                )
+                ax.scatter(point, y_f, color=POINT_COLOUR, s=15, zorder=5)
 
                 # Vertical deviation
                 ax.plot(
@@ -206,14 +199,7 @@ def _plot_deviation_markers(ax, approx, points, label="Alternance points"):
             y_f = approx.f(point)
 
             # Point on the function.
-            ax.scatter(
-                point,
-                y_f,
-                color=POINT_COLOUR,
-                s=15,
-                zorder=5,
-                label=label if j == 0 else None,
-            )
+            ax.scatter(point, y_f, color=POINT_COLOUR, s=15, zorder=5)
 
             # Vertical deviation.
             ax.plot(
@@ -258,20 +244,21 @@ def plot_duo(
     approx,
     points=None,
     f_label=r"$f(t)$",
+    deviation_label=r"$f(t)-S(t)$",
     approximation_label=r"$S(t)$",
     points_label="Basis points",
     title=None,
     file_name=None,
 ):
     """Plot two subplots: the function and its approximation, and the deviation."""
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
 
     # Functions
     _plot_function(ax1, approx, f_label)
     _plot_approximation(ax1, approx, approximation_label)
 
     # Deviation
-    _plot_deviation_curve(ax2, approx)
+    _plot_deviation_curve(ax2, approx, deviation_label=deviation_label)
 
     # Knots
     _plot_knots(ax1, approx)
@@ -279,18 +266,22 @@ def plot_duo(
 
     # Basis / alternance points
     if points is not None:
-        _plot_deviation_markers(ax1, approx, points, label=points_label)
-        _plot_basis_lines(ax2, approx, label=points_label)
+        _plot_deviation_markers(ax1, approx, points)
+        _plot_basis_lines(ax2, approx)
 
-    ax1.set_xlabel("t")
-    ax1.set_title("Approximation")
+    ax1.set_xlabel(r"$t$", fontsize=15)
 
-    ax2.set_xlabel("t")
-    ax2.set_ylabel(r"$f(t)-S(t)$")
-    ax2.set_title("Deviation")
+    ax2.set_xlabel(r"$t$", fontsize=15)
+    # ax2.set_ylabel(deviation_label, fontsize=15)
 
-    ax1.legend(loc="lower center", bbox_to_anchor=(0.5, -0.3))
-    ax2.legend(loc="lower center", bbox_to_anchor=(0.5, -0.3))
+    for ax in (ax1, ax2):
+        ax.legend(
+            fontsize=20,
+            loc="upper center",
+            bbox_to_anchor=(0.5, -0.15),
+            ncol=2,
+            frameon=False,
+        )
 
     _style_axes(ax1, ax2, labelsize=15)
 
@@ -319,14 +310,14 @@ def plot_report(
     _plot_approximation(ax, approx, approximation_label)
 
     if points is not None:
-        _plot_deviation_markers(ax, approx, points, label=points_label)
+        _plot_deviation_markers(ax, approx, points)
 
     ax.set_xlabel(r"$t$", fontsize=15)
 
     _style_axes(ax, labelsize=15)
 
     ax.legend(
-        fontsize=15,
+        fontsize=20,
         loc="upper center",
         bbox_to_anchor=(0.5, -0.15),
         ncol=2,

@@ -113,17 +113,16 @@ if __name__ == "__main__":
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
     a, b = -1, 1
-    m = 2
+    # m = 30
 
-    for degree in [2, 5, 12, 40]:
-        m = degree
+    for m in [2, 5, 12, 30]:
 
         approx = remez(f, a, b, m)
 
         plotting.plot_report(
             approx,
             points=approx.basis,
-            f_label=f_label,
+            f_label=r"$f_{1}(t)$",
             approximation_label=rf"$P_{{{m}}}(t)$",
-            file_name=f"remez_report_{function_name}_m{m}",
+            file_name=f"remez_f1_{function_name}_m{m}",
         )

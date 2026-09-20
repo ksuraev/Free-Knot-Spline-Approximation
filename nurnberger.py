@@ -111,20 +111,20 @@ def run(f, a, b, k, m, max_iter=100, verbose=False):
 
 if __name__ == "__main__":
     function_name = "g"
-
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
-    a, b = 0, 12
-    k = 1
-    m = 1
+    a, b = -1, 1
 
-    approx = run(f, a, b, k, m)
-    print(f"Final knots: {approx.g.knots}")
+    # report examples
+    pairs = [(1, 2), (2, 1), (2, 2), (6, 2)]
 
-    # plotting.plot_report(
-    #     approx,
-    #     points=approx.basis,
-    #     f_label=f_label,
-    #     approximation_label=rf"$S_{{{m},{k}}}(t)$",
-    #     file_name=f"nberger_{function_name}_a{a}_b{b}_k{k}_m{m}.png",
-    # )
+    for k, m in pairs:
+        approx = run(f, a, b, k, m)
+
+        plotting.plot_report(
+            approx,
+            points=approx.basis,
+            f_label=r"$f_{1}(t)$",
+            approximation_label=rf"$S_{{{m},{k}}}(t)$",
+            file_name=f"nberger_f1_{function_name}_a{a}_b{b}_k{k}_m{m}.png",
+        )

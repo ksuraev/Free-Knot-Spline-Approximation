@@ -82,6 +82,10 @@ def psi(f, a, b, theta, m, n, verbose=False):
     # Case 1: found optimal spline across two intervals
     if two_int_chain["exit_type"] == 1:
         approx = two_int_chain["approximation"]
+        if verbose:
+            print(
+                f"case 1: optimal spline found across two intervals at theta={theta:.10f}"
+            )
 
         _, _, d_star = approx.maxdeviation()
 
@@ -178,7 +182,7 @@ def armijo(f, a, b, theta, psi_theta, m, n, g, d, rho=0.5, c=0.1, verbose=False)
 
         if verbose:
             print(
-                f"alpha={alpha:.10f}, theta_next={theta_next:.10f}, psi_next={psi_next:.10f}, psi_theta={psi_theta:.10f}, g={g:.10f}, d={d:.10f}"
+                f"alpha={alpha:.10f}, theta_next={theta_next:.10f}, psi_next={psi_next:.10f}, psi_theta={psi_theta:.10f}, g={g:.10f}, d={d:.10f}\n"
             )
 
         # Check the Armijo condition
@@ -246,7 +250,7 @@ def find_optimal_theta(
     else:
         print(f"Maximum iterations ({i+1}) reached in find_optimal_theta()")
 
-    psi_theta = psi(f, a, b, theta, m, n)
+    psi_theta = psi(f, a, b, theta, m, n, verbose=verbose)
 
     if verbose:
         print(
@@ -257,11 +261,11 @@ def find_optimal_theta(
 
 
 if __name__ == "__main__":
-    function_name = "cos"
+    function_name = "cos_weird"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
-    a, b = test_functions.INTERVALS[function_name]
-
+    # a, b = test_functions.INTERVALS[function_name]
+    a, b = 0, 12
     k = 1
     n = k + 1
     m = 1
@@ -272,7 +276,9 @@ if __name__ == "__main__":
         theta_min = approx.g.knots[1]
 
     # Find optimal theta
-    theta_opt, psi_result, iterations, theta_path = find_optimal_theta(f, a, b, m, n, 1)
+    theta_opt, psi_result, iterations, theta_path = find_optimal_theta(
+        f, a, b, m, n, theta_min, verbose=True
+    )
 
     def case(case_num):
         if case_num == 1:
@@ -289,18 +295,18 @@ if __name__ == "__main__":
     )
 
     # Load precomputed psi(theta) values from the .npz file
-    data = np.load(f"psi_surface_{function_name}_k{k}_m{m}.npz")
-    thetas = data["theta_values"]
-    psi_values = data["psi_values"]
+    # data = np.load(f"psi_surface_{function_name}_k{k}_m{m}.npz")
+    # thetas = data["theta_values"]
+    # psi_values = data["psi_values"]
 
-    plotting.plot_objective_psi(
-        thetas,
-        psi_values,
-        theta_found=theta_opt,
-        psi_found=psi_result["d_max"],
-        theta_path=theta_path,
-        file_name=f"oneknotapprox_psi_{function_name}_k{k}_m{m}",
-    )
+    # plotting.plot_objective_psi(
+    #     thetas,
+    #     psi_values,
+    #     theta_found=theta_opt,
+    #     psi_found=psi_result["d_max"],
+    #     theta_path=theta_path,
+    #     file_name=f"oneknotapprox_psi_{function_name}_k{k}_m{m}",
+    # )
 
     plotting.plot_duo(
         psi_result["approximation"],
@@ -312,7 +318,7 @@ if __name__ == "__main__":
             f"{k} internal knots ({status}). "
             f"Max abs deviation: {psi_result['d_max']:.5f}."
         ),
-        file_name=f"oneknotapprox_duo_alg_{function_name}_k{k}_m{m}",
+        file_name=f"z_oneknotapprox_duo_alg_{function_name}_k{k}_m{m}",
     )
 
     # plotting.plot_report(

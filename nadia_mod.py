@@ -57,6 +57,7 @@ def exchange(i, t_star, d_star, f, approx, basis, knots, n, verbose=False):
     # Case 2: t* is a normal point - look only in current interval
     else:
         basis_points = basis[i]
+        print(f"basis_points: {basis_points}")
 
         left = basis_points[basis_points < t_star]
         right = basis_points[basis_points > t_star]
@@ -100,10 +101,10 @@ def exchange(i, t_star, d_star, f, approx, basis, knots, n, verbose=False):
     max_basis_deviation = np.max(np.abs(basis_deviations))
 
     # Absolute deviation at t* must be greater than the absolute deviation at any of the basis points in that interval
-    if abs(d_star) <= np.max(np.abs(basis_deviations)) + TOL:
+    if abs(d_star) <= np.max(np.abs(basis_deviations)) + 1e-4:
         if verbose:
             print(
-                f"EXIT 2: Absolute deviation at t*, {abs(d_star)} is <= max absolute deviation at basis points in interval {i}, {max_basis_deviation + TOL}"
+                f"EXIT 2: Absolute deviation at t*, {abs(d_star)} is <= max absolute deviation at basis points in interval {i}, {max_basis_deviation + 1e-4}"
             )
         return None
 
@@ -140,45 +141,48 @@ def gra(
 
 
 if __name__ == "__main__":
-    function_name = "f_g"
+    # evaluating psi section example
+    # function_name = "g"
+    # f, f_label = test_functions.TEST_FUNCTIONS[function_name]
+
+    # a, b = -1, 1
+    # k = 3  # number of internal fixed knots
+    # m = 1  # degree of polynomial to fit in each subinterval
+    # n = k + 1  # number of subintervals
+    # result = nadia_original.gra(
+    #     f, np.linspace(a, b, k + 2), m, n, exchange_function=exchange, verbose=True
+    # )
+    # status = "Optimal" if result["exit_type"] == 1 else "Not optimal"
+
+    # plotting.plot_duo(
+    #     result["approximation"],
+    #     points=result["approximation"].basis,
+    #     f_label=r"$f_{1}(t)$",
+    #     deviation_label=rf"$f_{1}(t)-S_{{{m},{k}}}(t)$",
+    #     approximation_label=rf"$S_{{{m},{k}}}(t)$",
+    #     file_name=f"z_duo_orig_f1_{function_name}_k{k}_m{m}",
+    # )
+
+    # evaluating graft section example
+    function_name = "cos_weird"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
-    a, b = -1, 1
-    k = 7  # number of internal fixed knots
-    m = 2  # degree of polynomial to fit in each subinterval
+    a, b = 0, 12
+    k = 1  # number of internal fixed knots
+    m = 3  # degree of polynomial to fit in each subinterval
     n = k + 1  # number of subintervals
 
-    # Choose initial knots
-    knots = np.array([-1, -5 / 6, -1 / 2, -1 / 6, 0, 1 / 6, 1 / 2, 5 / 6, 1])
+    knots = [a, 8, b]
 
-    # Pass the modified exchange function to gra
     result = nadia_original.gra(
-        f, knots, m, n, exchange_function=exchange, verbose=True
+        f, [8, b], m, 1, fixed_left_value=f(8), exchange_function=exchange, verbose=True
     )
-
-    status = "Optimal" if result["exit_type"] == 1 else "Non-optimal"
 
     plotting.plot_duo(
         result["approximation"],
         points=result["approximation"].basis,
-        f_label=f_label,
-        approximation_label=rf"$S_{{{m}}}(t)$",
-        title=(
-            f"Degree-{m} spline approximation of {f_label}. "
-            f"{k} internal knots ({status})."
-        ),
-        file_name=f"duo_mod_{function_name}_k{k}_m{m}.png",
+        f_label=r"$f_{2}(t)$",
+        deviation_label=rf"$f_{2}(t)-S_{{{m},{k}}}(t)$",
+        approximation_label=rf"$S_{{{m},{k}}}(t)$",
+        file_name=f"z_duo_f2_fixedtail_mod_{function_name}_k{k}_m{m}",
     )
-
-    # plotting.plot_report(
-    #     f,
-    #     result["S"],
-    #     a,
-    #     b,
-    #     knots=knots,
-    #     points=result["alternance_points"],
-    #     f_label=f_label,
-    #     approximation_label=rf"$S_{{{m}}}(t)$",
-    #     points_label="Alternance points",
-    #     file_name=f"mod_report_{function_name}_k{k}_m{m}.png",
-    # )

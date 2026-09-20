@@ -10,27 +10,22 @@ TOL = 1e-5
 ALTERNANCE_TOL = 1e-5
 
 
-# TODO: check about fixed tails - we need m points in fixed tails?
 def step_zero(knots, m, n, fixed_left_tail=False, fixed_right_tail=False):
-    """Form initial basis for the spline approximation.
-    m points per internal subinterval and m+1 points per endpoint subinterval.
-    Internal spline knots are excluded from the basis."""
+    """Form initial basis for the spline approximation."""
     basis = []
 
     for i in range(n):
-        start = knots[i]
-        end = knots[i + 1]
+        pts = m + 1 if i in (0, n - 1) else m
 
-        # pts = m + 1 if (i == 0 or i == n - 1) else m
-        if i == 0:
-            pts = m if fixed_left_tail else m + 1
-        elif i == n - 1:
-            pts = m if fixed_right_tail else m + 1
+        if n == 1 and fixed_left_tail != fixed_right_tail:
+            pts = m + 1
         else:
-            pts = m
+            if i == 0 and fixed_left_tail:
+                pts -= 1
+            if i == n - 1 and fixed_right_tail:
+                pts -= 1
 
-        local_basis = np.linspace(start, end, pts + 2)[1:-1]
-        basis.append(local_basis)
+        basis.append(np.linspace(knots[i], knots[i + 1], pts + 2)[1:-1])
 
     return basis
 
@@ -352,6 +347,7 @@ def gra(
 
 
 if __name__ == "__main__":
+    # evaluating psi section example
     function_name = "g"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
@@ -360,8 +356,6 @@ if __name__ == "__main__":
     m = 1  # degree of polynomial to fit in each subinterval
     n = k + 1  # number of subintervals
 
-    # Choose initial knots
-    # knots = np.array([-1, -5 / 6, -1 / 2, -1 / 6, 0, 1 / 6, 1 / 2, 5 / 6, 1])
     knots = np.linspace(a, b, k + 2)
 
     result = gra(f, knots, m, n, exchange_function=exchange, verbose=True)
@@ -371,11 +365,8 @@ if __name__ == "__main__":
     plotting.plot_duo(
         result["approximation"],
         points=result["approximation"].basis,
-        f_label=f_label,
-        approximation_label=rf"$S_{{{m}}}(t)$",
-        title=(
-            f"Degree-{m} spline approximation of {f_label}. "
-            f"{k} internal knots ({status}). "
-        ),
-        file_name=f"duo_orig_{function_name}_k{k}_m{m}.png",
+        f_label=r"$f_{1}(t)$",
+        deviation_label=rf"$f_{1}(t)-S_{{{m},{k}}}(t)$",
+        approximation_label=rf"$S_{{{m},{k}}}(t)$",
+        file_name=f"z_duo_orig_f1_{function_name}_k{k}_m{m}",
     )

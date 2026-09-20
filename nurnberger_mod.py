@@ -7,7 +7,7 @@ import Spline
 import test_functions
 
 ALTERNANCE_TOL = 1e-4
-TOL = 1e-5
+TOL = 1e-4
 
 
 def subroutine(f, x_i, b, m, d_n, max_iter):
@@ -45,7 +45,10 @@ def subroutine(f, x_i, b, m, d_n, max_iter):
 
     # x_min is the (m-2)nd alternance point in the interval [x_i, x_bar]
     alt_pts, _ = approx.alternancesequence()
-    x_min = alt_pts[m + 1]
+    if len(alt_pts) < m + 2:
+        x_min = approx.basis[-1]
+    else:
+        x_min = alt_pts[m + 1]
 
     return x_min
 
@@ -126,7 +129,6 @@ if __name__ == "__main__":
     m = 1  # degree of polynomial to fit
 
     approx, x_min = discontinuous_spline(f, a, b, k, m)
-    print(f"x_min: {x_min}")
 
     # plotting.plot_duo(
     #     approx,
