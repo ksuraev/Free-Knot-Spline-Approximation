@@ -1,4 +1,3 @@
-import matplotlib.pyplot as plt
 import numpy as np
 
 import nadia_mod
@@ -152,7 +151,7 @@ def psi(f, a, b, theta, m, n, verbose=False):
 
 
 def directional_derivative(f, a, b, theta, psi_theta, m, n, h):
-    """Directional derivative of psi at theta in the direction of h using finite differences."""
+    """Approximate the directional derivative of psi at theta in the direction of h using finite differences."""
     psi_theta_h = psi(f, a, b, theta + h, m, n)["d_max"]
 
     return (psi_theta_h - psi_theta) / abs(h)
@@ -208,8 +207,9 @@ def find_optimal_theta(
 ):
     """Find the optimal theta that minimises psi(theta) using directional derivatives and Armijo line search."""
     theta = theta_min
+    iterates = [theta]
 
-    for k in range(max_iter):
+    for i in range(max_iter):
         # Compute the approximate directional derivatives at the current theta
         psi_theta = psi(f, a, b, theta, m, n, verbose=verbose)["d_max"]
         g_plus = directional_derivative(f, a, b, theta, psi_theta, m, n, h)
@@ -217,7 +217,7 @@ def find_optimal_theta(
 
         if verbose:
             print(
-                f"k={k}, theta={theta:.10f}, psi={psi_theta:.10f} g_plus={g_plus:.10f}, g_minus={g_minus:.10f}"
+                f"i={i}, theta={theta:.10f}, psi={psi_theta:.10f} g_plus={g_plus:.10f}, g_minus={g_minus:.10f}"
             )
 
         # Determine the search direction based on the directional derivatives
@@ -235,6 +235,7 @@ def find_optimal_theta(
         theta_next = armijo(
             f, a, b, theta, psi_theta, m, n, g, d, rho, c, verbose=verbose
         )
+        iterates.append(theta_next)
 
         # Check for convergence based on the change in theta
         if abs(theta_next - theta) < tolerance:
@@ -243,7 +244,7 @@ def find_optimal_theta(
         theta = theta_next
 
     else:
-        print(f"Maximum iterations ({max_iter}) reached in find_optimal_theta()")
+        print(f"Maximum iterations ({i+1}) reached in find_optimal_theta()")
 
     psi_theta = psi(f, a, b, theta, m, n)
 
@@ -252,14 +253,14 @@ def find_optimal_theta(
             f"Optimal theta found: {theta:.10f} with psi(theta)={psi_theta['d_max']:.10f}"
         )
 
-    return theta, psi_theta
+    return theta, psi_theta, i + 1, iterates
 
 
 if __name__ == "__main__":
-    function_name = "cos_weird"
+    function_name = "cos"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
-    a, b = 0, 12
+    a, b = test_functions.INTERVALS[function_name]
 
     k = 1
     n = k + 1
@@ -267,53 +268,57 @@ if __name__ == "__main__":
 
     approx, theta_min = nurnberger_mod.discontinuous_spline(f, a, b, k, m)
 
-    print(f"theta_min: {theta_min}")
+    if theta_min is None:
+        theta_min = approx.g.knots[1]
 
-    # if theta_min is None:
-    #     theta_min = approx.g.knots[1]
+    # Find optimal theta
+    theta_opt, psi_result, iterations, theta_path = find_optimal_theta(f, a, b, m, n, 1)
 
-    # # Find optimal theta
-    # theta_opt, psi_result = find_optimal_theta(f, a, b, m, n, -0.5, verbose=True)
+    def case(case_num):
+        if case_num == 1:
+            return "two intervals"
+        elif case_num == 2:
+            return "fixed left"
+        elif case_num == 3:
+            return "fixed right"
 
-    # def case(case_num):
-    #     if case_num == 1:
-    #         return "two intervals"
-    #     elif case_num == 2:
-    #         return "fixed left"
-    #     elif case_num == 3:
-    #         return "fixed right"
+    status = (
+        f"optimal, {case(psi_result['case'])}"
+        if psi_result["optimal"]
+        else f"not optimal, {case(psi_result['case'])}"
+    )
 
-    # status = (
-    #     f"optimal, {case(psi_result['case'])}"
-    #     if psi_result["optimal"]
-    #     else f"not optimal, {case(psi_result['case'])}"
-    # )
+    # Load precomputed psi(theta) values from the .npz file
+    data = np.load(f"psi_surface_{function_name}_k{k}_m{m}.npz")
+    thetas = data["theta_values"]
+    psi_values = data["psi_values"]
 
-    # plotting.plot_duo(
+    plotting.plot_objective_psi(
+        thetas,
+        psi_values,
+        theta_found=theta_opt,
+        psi_found=psi_result["d_max"],
+        theta_path=theta_path,
+        file_name=f"oneknotapprox_psi_{function_name}_k{k}_m{m}",
+    )
+
+    plotting.plot_duo(
+        psi_result["approximation"],
+        points=psi_result["approximation"].basis,
+        f_label=f_label,
+        approximation_label=rf"$S_{{{m},{k}}}(t)$",
+        title=(
+            f"Degree-{m} spline approximation of {f_label}. "
+            f"{k} internal knots ({status}). "
+            f"Max abs deviation: {psi_result['d_max']:.5f}."
+        ),
+        file_name=f"oneknotapprox_duo_alg_{function_name}_k{k}_m{m}",
+    )
+
+    # plotting.plot_report(
     #     psi_result["approximation"],
     #     points=psi_result["approximation"].basis,
     #     f_label=f_label,
     #     approximation_label=rf"$S_{{{m},{k}}}(t)$",
-    #     title=(
-    #         f"Degree-{m} spline approximation of {f_label}. "
-    #         f"{k} internal knots ({status}). "
-    #         f"Max abs deviation: {psi_result['d_max']:.5f}."
-    #     ),
-    #     file_name=f"duo_alg_{function_name}_k{k}_m{m}",
+    #     file_name=f"oneknotapprox_report_{function_name}_k{k}_m{m}",
     # )
-
-    # Plot psi(theta) over the interval [a + 0.1, b - 0.1]
-    start_theta = a + 0.1
-    end_theta = b - 0.1
-    plotting.plot_objective_psi(
-        f,
-        a,
-        b,
-        m,
-        n,
-        start_theta,
-        end_theta,
-        psi_function=psi,
-        file_name=f"PSI_{function_name}_a{a}_b{b}_k{k}_m{m}",
-        step=0.01,
-    )
