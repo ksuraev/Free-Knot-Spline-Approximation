@@ -1,10 +1,17 @@
+import sys
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+ROOT = SCRIPT_DIR.parent
+
+sys.path.insert(0, str(ROOT))
+
 import compute_psi_samples
+
 import nurnberger
 import nurnberger_mod
 import one_knot_approx
@@ -33,6 +40,7 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
         initial_approx = initial_result["approximation"]
         initial_max_deviation = abs(initial_approx.maxdeviation()[2])
         initial_d_max = initial_result["d_max"]
+        initial_basis = initial_approx.basis
         initial_alternance_points = initial_approx.alternancesequence()[0]
         initial_status = initial_result["optimal"]
         initial_case = initial_result["case"]
@@ -40,7 +48,7 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
         # Plot the initial spline approximation
         plotting.plot_report(
             initial_approx,
-            points=initial_alternance_points,
+            points=initial_basis,
             f_label=f_label,
             approximation_label=rf"$S_{{{m},{k}}}(t)$",
             file_name=f"{function}_k{k}_m{m}_initial",
@@ -52,7 +60,7 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
             theta_start = approx.g.knots[1]
 
         # Use precomputed psi(theta) values from the .npz file to get thetas and psi_values
-        npz_path = Path(f"psi_surface_{function}_k{k}_m{m}.npz")
+        npz_path = Path(f"psi_surfaces/psi_surface_{function}_k{k}_m{m}.npz")
         if npz_path.exists():
             data = np.load(npz_path)
             thetas = data["theta_values"]
@@ -109,6 +117,7 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
         final_basis = final_approx.basis
         final_max_deviation = abs(final_approx.maxdeviation()[2])
         final_alternance_points = final_approx.alternancesequence()
+        final_basis_points = final_approx.basis
         final_d_max = result["d_max"]
         final_gra_d_max = result.get("gra_d_max", None)
         final_status = result["optimal"]
@@ -117,7 +126,7 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
         # Plot the final spline approximation
         plotting.plot_report(
             result["approximation"],
-            points=final_alternance_points[0],
+            points=final_basis,
             f_label=f_label,
             approximation_label=rf"$S_{{{m},{k}}}(t)$",
             file_name=f"{function}_k{k}_m{m}_final",
