@@ -222,14 +222,12 @@ class Approximation:
 
         return extrema
 
-    def maxdeviation(self, n_samples=10000):
+    def maxdeviation(self, n_samples=1000):
         extrema = self._extrema(n_samples)
-
         d_max = max(extrema, key=lambda x: abs(x[2]))
-
         return d_max
 
-    def maxdeviationpoints(self, tol=1e-5, n_samples=10000):
+    def maxdeviationpoints(self, tol=1e-5, n_samples=1000):
         """Return all points attaining the maximum absolute deviation."""
         extrema = self._extrema(n_samples)
 
@@ -240,7 +238,7 @@ class Approximation:
 
         return [(t, d) for _, t, d in extrema if abs(abs(d) - global_max) <= tol]
 
-    def alternancesequence(self, tol=1e-4, n_samples=10000):
+    def alternancesequence(self, tol=1e-4, n_samples=1000):
         """Return largest sequence of alternance points, with their signs."""
         points = self.maxdeviationpoints(tol=tol, n_samples=n_samples)
 

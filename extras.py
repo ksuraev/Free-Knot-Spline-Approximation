@@ -36,9 +36,12 @@ def find_descent_direction(basis, S, signs):
     q = np.zeros(G.shape[1])
     A = np.ones(G.shape[1])
     b = np.ones(1)
-    x = solve_qp(P, q, None, None, A, b, lb=q, solver="cvxopt")
+    #x = solve_qp(P, q, None, None, A, b, lb=q, solver="cvxopt")
+    x = solve_qp(P, q, None, None, A, b, lb=q, solver="clarabel")
+    v = G@x
+    #print(f"Vector: {G.T @ v}, norm: {v@v}")
 
-    return -G @ x
+    return -v
 
 
 # [-len(S.knots) + 2 :]
@@ -58,7 +61,8 @@ def build_simplex_system(f, samples, knots, m):
 
 
 def solve_simplex(f, knots, m):
-    samples = np.linspace(knots[0], knots[-1], 1000)
+    nsamples = 1000
+    samples = np.linspace(knots[0], knots[-1], nsamples)
     A, b = build_simplex_system(f, samples, knots, m)
 
     # Objective function: minimise the last variable (the deviation)
@@ -76,11 +80,18 @@ def solve_simplex(f, knots, m):
 
     # Loop over constraint rows
     for i in range(A.shape[0]):
-        constraint = pl.lpSum(A[i, j] * x[j] for j in range(A.shape[1])) - z <= b[i]
+        constraint = pl.lpSum(A[i, j] * x[j] for j in range(A.shape[1])) - z <= b[i], f"{i}"
         prob += constraint
 
-    solver = pl.HiGHS_CMD(msg=False)
+    solver = pl.HiGHS(msg=False)
     prob.solve(solver)
+
+    # The active constraints should give us the maximum deviation points:
+    active = [int(name) for name, c in list(prob.constraints.items()) if c.slack == 0]
+    t_active = np.array([[samples[i], -1] if i<nsamples else [samples[i - nsamples], 1] for i in active])
+    t_active = t_active[np.argsort(t_active[:,0])]
+    basis = t_active[:,0] # [t for [t, _] in t_active]
+    signs = t_active[:,1] # [s for [_, s] in t_active]
 
     # Extract the solution for the coefficients and the deviation
     r = np.array([x[j].varValue for j in range(A.shape[1])])
@@ -91,13 +102,14 @@ def solve_simplex(f, knots, m):
     # Create the spline from the coefficients and knots
     polynomials = [Spline.Polynomial(c, offset=x) for c, x in zip(coeffs, knots[:-1])]
     S = Spline.SUSpline(knots, polynomials)
+    A = Spline.Approximation(f, S, [knots[0], knots[-1]], basis=basis)
 
-    return S, z.varValue
+    return z.varValue, A, signs
 
 
 def directional_derivative(f, knots, m, d_full, h=0.0001):
-    psi_theta = solve_simplex(f, knots, m)[1]
-    psi_new = solve_simplex(f, knots + h * d_full, m)[1]
+    psi_theta, _, _ = solve_simplex(f, knots, m)[1]
+    psi_new, _, _ = solve_simplex(f, knots + h * d_full, m)[1]
 
     return (psi_new - psi_theta) / (h * np.linalg.norm(d_full))
 
@@ -110,7 +122,7 @@ def armijo(f, S, knots, m, d, rho=0.5, c=0.1, verbose=False):
     directional_deriv = directional_derivative(f, knots, m, d_full)
     print(f"Directional derivative: {directional_deriv:.5f}")
     curr_knots = knots.copy()
-    psi_theta = solve_simplex(f, curr_knots, m)[1]
+    psi_theta, _, _ = solve_simplex(f, curr_knots, m)[1]
 
     while alpha > 1e-8:
         # Compute the next knots using the step size alpha
@@ -121,7 +133,7 @@ def armijo(f, S, knots, m, d, rho=0.5, c=0.1, verbose=False):
             alpha *= rho
             continue
 
-        psi_next = solve_simplex(f, next_knots, m)[1]
+        psi_next, _, _ = solve_simplex(f, next_knots, m)[1]
         # print(
         #     f"alpha: {alpha:.5f}, psi_next: {psi_next:.5f}, psi_theta: {psi_theta:.5f}"
         # )
@@ -138,12 +150,11 @@ def armijo(f, S, knots, m, d, rho=0.5, c=0.1, verbose=False):
 
 def get_direction(f, knots, m):
     # eval Psi
-    S, deviation = solve_simplex(f, knots, m)
-    approx = Spline.Approximation(f, S, (a, b), basis=None)
+    deviation, approx, signs = solve_simplex(f, knots, m)
 
-    all_pts = approx.maxdeviationpoints()
-    basis = [t for [t, d] in all_pts]
-    signs = [np.sign(d) for [t, d] in all_pts]
+    S = approx.g
+    # all_pts = approx.maxdeviationpoints()
+    basis = approx.basis
 
     d = find_descent_direction(basis, S, signs)
     return d, S
@@ -170,42 +181,48 @@ if __name__ == "__main__":
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
     a, b = -1, 1
-    k = 5
+    k = 2
     m = 2
 
     approx, x_min = nurnberger_mod.discontinuous_spline(f, a, b, k, m)
-    print(f"x_min: {x_min}")
-    if x_min is None:
-        x_min = approx.g.knots[1]
+    # print(f"x_min: {x_min}")
+    # if x_min is None:
+    #     x_min = approx.g.knots[1]
 
     # new_knots, S, iteration = descent_algo(x_min, f, a, b, m, k)
-    new_knots = np.linspace(a, -0.5, k + 1)
-    new_knots = np.concatenate([new_knots, [b]])
+    knots = np.linspace(a, x_min, k + 1)
+    knots = np.concatenate([knots, [b]])
 
-    S, z = solve_simplex(f, new_knots, m)
-    approx = Spline.Approximation(f, S, (a, b), basis=None)
-    maxdev = approx.maxdeviation()
-    print(f"Max deviation: {maxdev[2]:.5f}")
-    basis = [t for [t, d] in approx.maxdeviationpoints()]
-    signs = [np.sign(d) for [t, d] in approx.maxdeviationpoints()]
-    G = find_descent_direction(basis, S, signs)
-    print(f"Descent direction: {G}")
-    h = 0.000001
-    newnewknots = new_knots + h * np.concatenate([[0], G[-len(new_knots) + 2 :], [0]])
+    z, approx, signs = solve_simplex(f, knots, m)
+    S = approx.g
+    plotting.plot_duo(
+        approx,
+        title=f"Descent algorithm for {f_label} with {k} internal knots and degree {m}",
+        file_name=f"descent_{function_name}_k{k}_m{m}",
+    )
+
+    maxdev_before = approx.maxdeviation()
+    #print(f"Max deviation before descent: {maxdev_before[2]:.5f}")
+    basis = approx.basis
+    g = find_descent_direction(basis, S, signs)
+    print(f"Descent direction: {g}")
+    h = 1.0
+    new_knots = knots + h * np.concatenate([[0], g[-len(knots) + 2 :], [0]])
+
     a = np.concatenate([p.coef[1:] for p in S.polynomials])
-    # a = np.concatenate([S.polynomials[0].coef[0], a])
-    new_a = a + h * G[1 : -len(new_knots) + 2]
-    newnew_a = new_a.reshape(len(new_knots) - 1, m)
-    print(f"New coefficients: {newnew_a}")
+    new_a = a + h * g[1 : -len(knots) + 2]
+    newnew_a = new_a.reshape(len(knots) - 1, m)
+    # print(f"New coefficients: {newnew_a}")
     newnew_a = [np.concatenate([[0], c]) for c in newnew_a]
-    newnew_a[0][0] = S.polynomials[0].coef[0] + h * G[0]
+    newnew_a[0][0] = S.polynomials[0].coef[0] + h * g[0]
     spline = Spline.SUSpline(
-        newnewknots,
-        [Spline.Polynomial(c, offset=x) for c, x in zip(newnew_a, newnewknots[:-1])],
+        new_knots,
+        [Spline.Polynomial(c, offset=x) for c, x in zip(newnew_a, new_knots[:-1])],
     )
     approx = Spline.Approximation(f, spline, (a, b), basis=None)
     maxdev = approx.maxdeviation()
-    print(f"Max deviation: {maxdev[2]:.5f}")
+    print(f"Max deviation: before: {maxdev_before[2]}, and after: {maxdev[2]:.5f}")
+    print(f"Improvement (positive is good): {maxdev_before[2] - maxdev[2]:.5f}")
     # print(f"Descent algorithm completed in {iteration} iterations.")
     # approx = Spline.Approximation(f, S, (a, b), basis=None)
     # plotting.plot_duo(
