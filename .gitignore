@@ -12,4 +12,4 @@ plots
 report_plot.py
 prev_code/
 /test\ loops/
-experiments/experiment_report.pdf
+experiments/*.pdf
