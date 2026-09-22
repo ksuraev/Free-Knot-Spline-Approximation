@@ -12,9 +12,11 @@ sys.path.insert(0, str(ROOT))
 
 import compute_psi_samples
 
+import extras
 import nurnberger
 import nurnberger_mod
 import plotting
+import Spline
 import test_functions
 
 experiments = [
@@ -34,13 +36,18 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
         a, b = test_functions.INTERVALS[function]
 
         # Compute initial spline approximation based on equidistant knots
-
+        initial_knots = np.linspace(a, b, k + 2)
+        initial_z, initial_approx, initial_signs = extras.solve_simplex(
+            f, initial_knots, m
+        )
         # Plot the initial spline approximation
-
-        # # Compute initial discontinuous spline approximation and find starting theta
-        # approx, theta_start = nurnberger_mod.discontinuous_spline(f, a, b, k, m)
-        # if theta_start is None:
-        #     theta_start = approx.g.knots[1:-1]
+        plotting.plot_report(
+            initial_approx,
+            points=initial_approx.basis,
+            f_label=f_label,
+            approximation_label=rf"$S_{{{m}}}(t)$",
+            file_name=f"{function}_k{k}_m{m}_initial",
+        )
 
         # Use precomputed psi(theta) values from the .npz file to get thetas and psi_values
         npz_path = Path(f"psi_surfaces/psi_surface_{function}_k{k}_m{m}.npz")
@@ -81,8 +88,8 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
 
         # Plot psi(theta) as contour plot with Nurnberger's original and modified points
         nurnberger_original = nurnberger.run(f, a, b, k, m).g.knots[1:-1]
-        nurnberger_modified, _ = nurnberger_mod.discontinuous_spline(f, a, b, k, m)
-        nurnberger_modified = nurnberger_modified.g.knots[1:-1]
+        modified_approx, _ = nurnberger_mod.discontinuous_spline(f, a, b, k, m)
+        nurnberger_modified = modified_approx.g.knots[1:-1]
 
         plotting.plot_objective_psi_contour(
             theta_1_values,
@@ -94,33 +101,51 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
         )
 
         # Find optimal knots
-
-        # Plot psi(theta) again, this time highlighting the optimal found by the algorithm
+        opt_knots, S, final_approx, iterations, iterates = extras.descent_algo(
+            nurnberger_modified, f, a, b, m, k, track_iterates=True
+        )
 
         # Plot psi(theta) again, this time highlighting the optimal theta found by the algorithm and the path taken by the algorithm
+        plotting.plot_objective_psi_3d(
+            theta_1_values,
+            theta_2_values,
+            psi_values,
+            theta_found=opt_knots[1:-1],
+            theta_path=iterates,
+            file_name=f"psi_path_{function}_k{k}_m{m}",
+        )
+
+        plotting.plot_objective_psi_contour(
+            theta_1_values,
+            theta_2_values,
+            psi_values,
+            theta_found=opt_knots[1:-1],
+            theta_path=iterates,
+            file_name=f"psi_path_contour_{function}_k{k}_m{m}",
+        )
 
         # Plot the final spline approximation
+        plotting.plot_report(
+            final_approx,
+            points=final_approx.basis,
+            f_label=f_label,
+            approximation_label=rf"$S_{{{m}}}(t)$",
+            file_name=f"{function}_k{k}_m{m}_final",
+        )
 
-        # result = {
-        #     "function": function,
-        #     "m": m,
-        #     "k": k,
-        #     "initialstatus": initial_status,
-        #     "initialcase": initial_case,
-        #     "initialtheta": initial_theta,
-        #     "initialmaxdeviation": initial_max_deviation,
-        #     "thetastart": theta_start,
-        #     "thetahat": theta_opt,
-        #     "psithetahat": psi_opt,
-        #     "thetasamplemin": theta_sample_min,
-        #     "psithetastar": psi_sample_min,
-        #     "finalstatus": final_status,
-        #     "finalmaxdeviation": final_max_deviation,
-        #     "iterations": iterations,
-        # }
-        # results.append(result)
+        result = {
+            "function": function,
+            "m": m,
+            "k": k,
+            "initialmaxdeviation": initial_z,
+            "theta_initial": initial_knots[1:-1],
+            "thetastart": nurnberger_modified,
+            "thetaopt": opt_knots[1:-1],
+            "finalmaxdeviation": final_approx.maxdeviation()[2],
+            "iterations": iterations,
+        }
+        results.append(result)
 
+df = pd.DataFrame(results)
 
-# df = pd.DataFrame(results)
-
-# df.to_csv("k2results.csv", index=False)
+df.to_csv("experiments/k2results.csv", index=False)

@@ -332,6 +332,28 @@ def _psi_at(theta, thetas, psi_values):
     return np.interp(theta, thetas, psi_values)
 
 
+def _psi_at_3d(theta, theta_1_values, theta_2_values, psi_values):
+    theta = np.asarray(theta)
+
+    if theta.ndim == 1:
+        theta = theta[None, :]
+
+    values = []
+
+    for theta_1, theta_2 in theta:
+        i = np.argmin(np.abs(theta_1_values - theta_1))
+        j = np.argmin(np.abs(theta_2_values - theta_2))
+
+        value = psi_values[i, j]
+
+        if not np.isfinite(value):
+            print(f"No finite psi value near " f"({theta_1:.3f}, {theta_2:.3f})")
+
+        values.append(value)
+
+    return np.asarray(values)
+
+
 def plot_objective_psi(
     thetas,
     psi_values,
@@ -645,7 +667,7 @@ def plot_objective_psi_contour(
             linewidths=1.5,
             zorder=9,
             label=(
-                rf"$(\theta_1^{{\min}},\theta_2^{{\min}})="
+                rf"$(\theta_1^{{\mathrm{{mod}}}},\theta_2^{{\mathrm{{mod}}}})="
                 rf"({nurnbergers_mod_point[0]:.3f},{nurnbergers_mod_point[1]:.3f})$"
             ),
         )
@@ -658,7 +680,7 @@ def plot_objective_psi_contour(
     handles, labels = ax.get_legend_handles_labels()
     if handles:
         ax.legend(
-            fontsize=10,
+            fontsize=16,
             loc="upper center",
             bbox_to_anchor=(0.5, -0.12),
             ncol=2,
@@ -682,9 +704,7 @@ def plot_objective_psi_3d(
     theta_2_values,
     psi_values,
     theta_found=None,
-    psi_found=None,
     theta_path=None,
-    psi_path=None,
     file_name=None,
     figsize=(7, 5),
 ):
@@ -704,10 +724,6 @@ def plot_objective_psi_3d(
         ~((theta_1_grid < theta_2_grid) & np.isfinite(psi_values)),
         psi_values,
     )
-    valid = theta_1_grid < theta_2_grid
-    bad = valid & np.isnan(surface_values)
-
-    print("Number of missing valid values:", np.count_nonzero(bad))
 
     if np.all(np.isnan(surface_values)):
         raise ValueError("No valid surface values.")
@@ -722,7 +738,7 @@ def plot_objective_psi_3d(
     y_min, y_max = theta_2_values.min(), theta_2_values.max()
 
     fig = plt.figure(figsize=figsize)
-    ax = fig.add_subplot(111, projection="3d")
+    ax = fig.add_subplot(111, projection="3d", computed_zorder=False)
 
     ax.set_proj_type("ortho")
     ax.view_init(elev=28, azim=-25)
@@ -738,7 +754,70 @@ def plot_objective_psi_3d(
         surface_values,
         cmap="coolwarm",
         antialiased=True,
+        alpha=0.8,
     )
+    # Path taken by the algorithm
+    if theta_path is not None:
+        theta_path = np.asarray(theta_path)
+
+        path_psi = _psi_at_3d(
+            theta_path,
+            theta_1_values,
+            theta_2_values,
+            psi_values,
+        )
+        ax.plot(
+            theta_path[:, 0],
+            theta_path[:, 1],
+            path_psi,
+            color="black",
+            linestyle=":",
+            linewidth=1,
+            zorder=10,
+            label="Iterates",
+        )
+
+        ax.scatter(
+            theta_path[:-1, 0],
+            theta_path[:-1, 1],
+            path_psi[:-1],
+            color="black",
+            marker="o",
+            s=2,
+            depthshade=False,
+            zorder=11,
+        )
+    if theta_path is not None and theta_found is None:
+        theta_found = theta_path[-1]
+
+        psi_found = _psi_at_3d(
+            theta_found,
+            theta_1_values,
+            theta_2_values,
+            psi_values,
+        )[0]
+    if theta_found is not None:
+        psi_found = _psi_at_3d(
+            theta_found,
+            theta_1_values,
+            theta_2_values,
+            psi_values,
+        )[0]
+
+        ax.scatter(
+            theta_found[0],
+            theta_found[1],
+            psi_found,
+            marker="x",
+            color="black",
+            s=10,
+            linewidths=1,
+            depthshade=False,
+            zorder=12,
+            label=(
+                rf"$\hat{{\theta}}=" rf"({theta_found[0]:.3f},{theta_found[1]:.3f})$"
+            ),
+        )
 
     ax.xaxis.pane.fill = False
     ax.yaxis.pane.fill = False
@@ -757,15 +836,17 @@ def plot_objective_psi_3d(
     ax.tick_params(axis="y", labelsize=11)
     ax.tick_params(axis="z", labelsize=11)
 
-    # ax.legend(
-    #     fontsize=10,
-    #     loc="upper center",
-    #     bbox_to_anchor=(0.5, -0.10),
-    #     ncol=2,
-    #     frameon=False,
-    #     handletextpad=0.4,
-    #     columnspacing=1.0,
-    # )
+    handles, labels = ax.get_legend_handles_labels()
+    if handles:
+        ax.legend(
+            fontsize=16,
+            loc="upper center",
+            bbox_to_anchor=(0.5, -0.12),
+            ncol=2,
+            frameon=False,
+            handletextpad=0.4,
+            columnspacing=1.0,
+        )
 
     fig.tight_layout()
 

@@ -162,36 +162,6 @@ def add_k1_page(document, record):
     )
 
 
-def add_k2_page(document, function, m):
-    k = 2
-    prefix = f"{function}_k{k}_m{m}"
-
-    plots = [
-        PLOTS / f"psi_{prefix}.pdf",
-        PLOTS / f"psi_contour_{prefix}_nurnberger_points.pdf",
-    ]
-
-    titles = [
-        "Objective surface",
-        "Contour plot with Nürnberger points",
-    ]
-
-    page = new_page(document, function, k, m)
-
-    rects = grid_rects(
-        rows=1,
-        cols=2,
-        top=40,
-    )
-
-    add_plots(
-        page,
-        plots,
-        titles,
-        rects,
-    )
-
-
 def main():
     document = pymupdf.open()
 
@@ -201,14 +171,6 @@ def main():
 
     for _, record in results.iterrows():
         add_k1_page(document, record)
-
-    # k = 2
-    for function in test_functions.TEST_FUNCTIONS:
-        for m in range(1, 4):
-            surface = PLOTS / f"psi_{function}_k2_m{m}.pdf"
-
-            if surface.exists():
-                add_k2_page(document, function, m)
 
     if OUTPUT.exists():
         OUTPUT.unlink()
