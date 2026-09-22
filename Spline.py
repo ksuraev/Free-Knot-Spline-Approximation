@@ -128,7 +128,7 @@ class Spline:
             + "\n"
         )
 
-    # This should ideally return an Approximation object.
+    # TODO
     @classmethod
     def interpolate(f, points):
         """Interpolate the function `f` through the given points."""
@@ -175,8 +175,6 @@ class SUSpline(Spline):
         return sum(p(t) for p in self.polynomials if t >= p.offset)
 
 
-# We can get our algorithms to return an object of this type
-# with appropriately picked parameters.
 class Approximation:
     """An approximation of f by g."""
 

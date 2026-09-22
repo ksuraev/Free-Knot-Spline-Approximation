@@ -57,7 +57,6 @@ def exchange(i, t_star, d_star, f, approx, basis, knots, n, verbose=False):
     # Case 2: t* is a normal point - look only in current interval
     else:
         basis_points = basis[i]
-        print(f"basis_points: {basis_points}")
 
         left = basis_points[basis_points < t_star]
         right = basis_points[basis_points > t_star]
@@ -142,26 +141,27 @@ def gra(
 
 if __name__ == "__main__":
     # evaluating psi section example
-    # function_name = "g"
-    # f, f_label = test_functions.TEST_FUNCTIONS[function_name]
+    function_name = "g"
+    f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
-    # a, b = -1, 1
-    # k = 3  # number of internal fixed knots
-    # m = 1  # degree of polynomial to fit in each subinterval
-    # n = k + 1  # number of subintervals
-    # result = nadia_original.gra(
-    #     f, np.linspace(a, b, k + 2), m, n, exchange_function=exchange, verbose=True
-    # )
-    # status = "Optimal" if result["exit_type"] == 1 else "Not optimal"
+    a, b = -1, 1
+    k = 3  # number of internal fixed knots
+    m = 1  # degree of polynomial to fit in each subinterval
+    n = k + 1  # number of subintervals
+    result = nadia_original.gra(
+        f, np.linspace(a, b, k + 2), m, n, exchange_function=exchange, verbose=True
+    )
+    status = "Optimal" if result["exit_type"] == 1 else "Not optimal"
 
-    # plotting.plot_duo(
-    #     result["approximation"],
-    #     points=result["approximation"].basis,
-    #     f_label=r"$f_{1}(t)$",
-    #     deviation_label=rf"$f_{1}(t)-S_{{{m},{k}}}(t)$",
-    #     approximation_label=rf"$S_{{{m},{k}}}(t)$",
-    #     file_name=f"z_duo_orig_f1_{function_name}_k{k}_m{m}",
-    # )
+    plotting.plot_duo(
+        result["approximation"],
+        points=result["approximation"].basis,
+        f_label=r"$f_{1}(t)$",
+        deviation_label=rf"$f_{1}(t)-S_{{{m}}}(t)$",
+        approximation_label=rf"$S_{{{m}}}(t)$",
+        approximation_title=f"{status} approximation",
+        file_name=f"z_duo_orig_f1_{function_name}_k{k}_m{m}",
+    )
 
     # evaluating graft section example
     function_name = "cos_weird"
@@ -182,7 +182,7 @@ if __name__ == "__main__":
         result["approximation"],
         points=result["approximation"].basis,
         f_label=r"$f_{2}(t)$",
-        deviation_label=rf"$f_{2}(t)-S_{{{m},{k}}}(t)$",
-        approximation_label=rf"$S_{{{m},{k}}}(t)$",
+        deviation_label=rf"$f_{2}(t)-S_{{{m}}}(t)$",
+        approximation_label=rf"$S_{{{m}}}(t)$",
         file_name=f"z_duo_f2_fixedtail_mod_{function_name}_k{k}_m{m}",
     )

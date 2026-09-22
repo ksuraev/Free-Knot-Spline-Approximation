@@ -16,6 +16,7 @@ import extras
 import nurnberger
 import nurnberger_mod
 import plotting
+import Spline
 import test_functions
 
 experiments = [
@@ -24,6 +25,11 @@ experiments = [
     for k in [2]
     for m in range(4, 7)
 ]
+
+function_labels = {
+    name: rf"$f_{{{i}}}$"
+    for i, name in enumerate(test_functions.TEST_FUNCTIONS, start=1)
+}
 
 results = []
 
@@ -151,5 +157,42 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
         results.append(result)
 
 df = pd.DataFrame(results)
-
 df.to_csv("experiments/k2results.csv", index=False)
+
+function_order = list(test_functions.TEST_FUNCTIONS.keys())
+
+function_labels = {
+    name: rf"$f_{{{i}}}$" for i, name in enumerate(function_order, start=1)
+}
+
+df["function_label"] = df["function"].map(function_labels)
+
+df["function"] = pd.Categorical(
+    df["function"],
+    categories=function_order,
+    ordered=True,
+)
+
+df = df.sort_values(["function", "m", "k"]).reset_index(drop=True)
+
+rows = []
+
+for i, row in df.iterrows():
+    rows.append(
+        f"{row['function_label']} & "
+        f"{int(row['m'])} & "
+        f"{int(row['k'])} & "
+        f"{row['initialdmax']:.4f} & "
+        f"{row['finaldmax']:.4f} & "
+        f"{int(row['iterations'])} \\\\"
+    )
+
+    next_function = df.loc[i + 1, "function"] if i + 1 < len(df) else None
+
+    if next_function != row["function"] and i + 1 < len(df):
+        rows.append(r"\addlinespace[0.5em]")
+
+with open("k2results_rows.tex", "w") as f:
+    f.write("\n".join(rows))
+
+df = pd.DataFrame(results)

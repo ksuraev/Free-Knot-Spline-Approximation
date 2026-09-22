@@ -60,6 +60,11 @@ def f_g(t):
 
 
 TEST_FUNCTIONS = {
+    "g": (g, r"$e^t(q(1.5t) + 2p(t) + 0.5q(0.5t))$"),
+    "cos_weird": (
+        f_cos_weird,
+        r"$\cos(t) + 0.1(t - 3\pi)$ if $t \leq 3\pi$, else $\cos(3t)$",
+    ),
     "cos": (f_cos, r"$\cos(t)$"),
     "sin": (f_sin, r"$\sin(t)$"),
     "sin3t": (f_sin_3t, r"$\sin(3t)$"),
@@ -67,10 +72,6 @@ TEST_FUNCTIONS = {
     "log_sin": (f_log_sin, r"$\log(\sin(t)+3)$"),
     "sin_if_else": (f_sin_if_else, r"$\sin(t)$ if $t \leq 2\pi$, else $\sin(2t)$"),
     "cos_if_else": (f_cos_if_else, r"$\cos(t)$ if $t \leq 2\pi$, else $\cos(3t)$"),
-    "cos_weird": (
-        f_cos_weird,
-        r"$\cos(t) + 0.1(t - 3\pi)$ if $t \leq 3\pi$, else $\cos(3t)$",
-    ),
     "sin_weird": (
         f_sin_weird,
         r"$\sin(t) + 0.1(t - 2\pi)$ if $t \leq 2\pi$, else $\sin(t)$",
@@ -79,7 +80,6 @@ TEST_FUNCTIONS = {
         f_exp_sin_cos,
         r"$e^t(\sin(3\pi t) + 2\cos(2\pi t) + 0.5\sin(\pi t))$",
     ),
-    "g": (g, r"$e^t(q(1.5t) + 2p(t) + 0.5q(0.5t))$"),
     "f_g": (f_g, r"$0.5(f(t) - g(t))$"),
 }
 

@@ -86,14 +86,11 @@ def add_results_text(page, record, rect):
         ("Initial status", "initialstatus"),
         ("Initial case", "initialcase"),
         ("Initial theta (chosen equidistant)", "initialtheta"),
-        ("Initial maxdeviation()", "initialmaxdeviation"),
         ("Initial d_max", "initialdmax"),
         ("theta_min (nurnberger)", "thetastart"),
         ("Final status", "finalstatus"),
         ("Final case", "finalcase"),
         ("final d_max", "finaldmax"),
-        ("final gra d_max", "finalgradmax"),
-        ("Final maxdeviation()", "finalmaxdeviation"),
         ("Iterations", "iterations"),
     ]
 

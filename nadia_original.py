@@ -360,13 +360,13 @@ if __name__ == "__main__":
 
     result = gra(f, knots, m, n, exchange_function=exchange, verbose=True)
 
-    status = "Optimal" if result["exit_type"] == 1 else "Not optimal"
-
     plotting.plot_duo(
         result["approximation"],
         points=result["approximation"].basis,
         f_label=r"$f_{1}(t)$",
-        deviation_label=rf"$f_{1}(t)-S_{{{m},{k}}}(t)$",
-        approximation_label=rf"$S_{{{m},{k}}}(t)$",
+        deviation_label=rf"$f_{1}(t)-S_{{{m}}}(t)$",
+        approximation_label=rf"$S_{{{m}}}(t)$",
+        # approximation_title="f and current iterate ",
+        # deviation_title="Current deviation at step r",
         file_name=f"z_duo_orig_f1_{function_name}_k{k}_m{m}",
     )

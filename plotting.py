@@ -246,7 +246,8 @@ def plot_duo(
     f_label=r"$f(t)$",
     deviation_label=r"$f(t)-S(t)$",
     approximation_label=r"$S(t)$",
-    points_label="Basis points",
+    approximation_title=None,
+    deviation_title=None,
     title=None,
     file_name=None,
 ):
@@ -272,6 +273,9 @@ def plot_duo(
     ax1.set_xlabel(r"$t$", fontsize=15)
 
     ax2.set_xlabel(r"$t$", fontsize=15)
+
+    ax1.set_title(approximation_title, fontsize=15)
+    ax2.set_title(deviation_title, fontsize=15)
 
     for ax in (ax1, ax2):
         ax.legend(

@@ -25,6 +25,11 @@ experiments = [
     for m in range(1, 4)
 ]
 
+function_labels = {
+    name: rf"$f_{{{i}}}$"
+    for i, name in enumerate(test_functions.TEST_FUNCTIONS, start=1)
+}
+
 results = []
 
 with tqdm(experiments, desc="Experiments", unit="case") as progress:
@@ -46,13 +51,13 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
         initial_case = initial_result["case"]
 
         # Plot the initial spline approximation
-        plotting.plot_report(
-            initial_approx,
-            points=initial_basis,
-            f_label=f_label,
-            approximation_label=rf"$S_{{{m},{k}}}(t)$",
-            file_name=f"{function}_k{k}_m{m}_initial",
-        )
+        # plotting.plot_report(
+        #     initial_approx,
+        #     points=initial_basis,
+        #     f_label=f_label,
+        #     approximation_label=rf"$S_{{{m},{k}}}(t)$",
+        #     file_name=f"{function}_k{k}_m{m}_initial",
+        # )
 
         # Compute initial discontinuous spline approximation and find starting theta
         approx, theta_start = nurnberger_mod.discontinuous_spline(f, a, b, k, m)
@@ -86,32 +91,32 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
         nurnberger_original = nurnberger.run(f, a, b, k, m).g.knots[1]
         nurnberger_modified = theta_start
 
-        plotting.plot_objective_psi(
-            thetas,
-            psi_values,
-            nurnbergers_orig_point=nurnberger_original,
-            nurnbergers_mod_point=nurnberger_modified,
-            file_name=f"psi_{function}_k{k}_m{m}_nurnberger_points",
-        )
+        # plotting.plot_objective_psi(
+        #     thetas,
+        #     psi_values,
+        #     nurnbergers_orig_point=nurnberger_original,
+        #     nurnbergers_mod_point=nurnberger_modified,
+        #     file_name=f"psi_{function}_k{k}_m{m}_nurnberger_points",
+        # )
 
         # Plot psi(theta) again, this time highlighting the optimal theta found by the algorithm
-        plotting.plot_objective_psi(
-            thetas,
-            psi_values,
-            theta_found=theta_opt,
-            psi_found=psi_opt,
-            file_name=f"psi_opt_{function}_k{k}_m{m}",
-        )
+        # plotting.plot_objective_psi(
+        #     thetas,
+        #     psi_values,
+        #     theta_found=theta_opt,
+        #     psi_found=psi_opt,
+        #     file_name=f"psi_opt_{function}_k{k}_m{m}",
+        # )
 
         # Plot psi(theta) again, this time highlighting the optimal theta found by the algorithm and the path taken by the algorithm
-        plotting.plot_objective_psi(
-            thetas,
-            psi_values,
-            theta_found=theta_opt,
-            psi_found=psi_opt,
-            theta_path=theta_path,
-            file_name=f"psi_opt_path_{function}_k{k}_m{m}",
-        )
+        # plotting.plot_objective_psi(
+        #     thetas,
+        #     psi_values,
+        #     theta_found=theta_opt,
+        #     psi_found=psi_opt,
+        #     theta_path=theta_path,
+        #     file_name=f"psi_opt_path_{function}_k{k}_m{m}",
+        # )
 
         final_approx = result["approximation"]
         final_basis = final_approx.basis
@@ -124,13 +129,13 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
         final_case = result["case"]
 
         # Plot the final spline approximation
-        plotting.plot_report(
-            result["approximation"],
-            points=final_basis,
-            f_label=f_label,
-            approximation_label=rf"$S_{{{m},{k}}}(t)$",
-            file_name=f"{function}_k{k}_m{m}_final",
-        )
+        # plotting.plot_report(
+        #     result["approximation"],
+        #     points=final_basis,
+        #     f_label=f_label,
+        #     approximation_label=rf"$S_{{{m},{k}}}(t)$",
+        #     file_name=f"{function}_k{k}_m{m}_final",
+        # )
 
         result = {
             "function": function,
@@ -158,4 +163,38 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
 
 df = pd.DataFrame(results)
 
-df.to_csv("k1results.csv", index=False)
+function_order = list(test_functions.TEST_FUNCTIONS.keys())
+
+function_labels = {
+    name: rf"$f_{{{i}}}$" for i, name in enumerate(function_order, start=1)
+}
+
+df["function_label"] = df["function"].map(function_labels)
+
+df["function"] = pd.Categorical(
+    df["function"],
+    categories=function_order,
+    ordered=True,
+)
+
+df = df.sort_values(["function", "m", "k"]).reset_index(drop=True)
+
+rows = []
+
+for i, row in df.iterrows():
+    rows.append(
+        f"{row['function_label']} & "
+        f"{int(row['m'])} & "
+        f"{int(row['k'])} & "
+        f"{row['initialdmax']:.4f} & "
+        f"{row['finaldmax']:.4f} & "
+        f"{int(row['iterations'])} \\\\"
+    )
+
+    next_function = df.loc[i + 1, "function"] if i + 1 < len(df) else None
+
+    if next_function != row["function"] and i + 1 < len(df):
+        rows.append(r"\addlinespace[0.5em]")
+
+with open("k1results_rows.tex", "w") as f:
+    f.write("\n".join(rows))
