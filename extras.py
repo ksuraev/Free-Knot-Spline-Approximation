@@ -4,6 +4,7 @@ from pathlib import Path
 
 import numpy as np
 import pulp as pl
+import qpsolvers
 from qpsolvers import solve_qp
 from qpsolvers.conversions.ensure_sparse_matrices import SparseConversionWarning
 
@@ -44,15 +45,16 @@ def find_descent_direction(basis, S, signs):
     q = np.zeros(G.shape[1])
     A = np.ones(G.shape[1])
     b = np.ones(1)
-    # x = solve_qp(P, q, None, None, A, b, lb=q, solver="cvxopt")
-    x = solve_qp(P, q, None, None, A, b, lb=q, solver="clarabel")
+    # y = solve_qp(P, q, None, None, A, b, lb=q, solver="cvxopt")
+
+    problem = qpsolvers.Problem(P, q, None, None, A, b, lb=q)
+    solution = qpsolvers.solve_problem(problem, solver="proxqp")
+
+    x = solution.x
     v = G @ x
     # print(f"Vector: {G.T @ v}, norm: {v@v}")
 
     return -v
-
-
-# [-len(S.knots) + 2 :]
 
 
 def build_simplex_system(f, samples, knots, m):
@@ -135,7 +137,8 @@ def armijo(f, S, knots, m, d, rho=0.5, c=0.1, verbose=False):
     # Initialise the step size
     alpha = 100.0
     d_full = np.concatenate([[0], d, [0]])
-    directional_deriv = directional_derivative(f, knots, m, d_full)
+    # directional_deriv = directional_derivative(f, knots, m, d_full)
+    # print(f"Directional derivative: {directional_deriv:.5f}")
     curr_knots = knots.copy()
     psi_theta, _, _ = solve_simplex(f, curr_knots, m)
 
@@ -169,24 +172,22 @@ def get_direction(f, knots, m):
     basis = approx.basis
     d = find_descent_direction(basis, S, signs)
 
-    return d, S, approx
+    return d, S, approx, deviation
 
 
 def descent_algo(theta_start, f, a, b, m, k, track_iterates=False):
     knots = np.concatenate([[a], theta_start, [b]])
-    # knots = np.linspace(a, x_min, k + 1)
-    # knots = np.concatenate([knots, [b]])
 
     if track_iterates:
-        iterates = [knots[1:-1].copy()]
+        iterates = [theta_start.copy()]
 
     for iteration in range(10):
-        d, S, approx = get_direction(f, knots, m)
-        knot_direction = d[-len(S.knots) + 2 :]
-        d_norm = np.linalg.norm(d)
+        d, S, approx, dev = get_direction(f, knots, m)
+        print(dev)
+        knot_direction = d[-k:]
 
-        # print(f"{iteration}: norm d = {d_norm:.5f}")
-        if d_norm < 1e-5:
+        print(f"{iteration}: norm d = {np.linalg.norm(d):.5f}")
+        if np.linalg.norm(d) < 1e-5:
             break
 
         knots = armijo(f, S, knots, m, knot_direction)
@@ -194,7 +195,7 @@ def descent_algo(theta_start, f, a, b, m, k, track_iterates=False):
         if track_iterates:
             iterates.append(knots[1:-1].copy())
 
-    _, S, approx = get_direction(f, knots, m)
+    _, S, approx, dev = get_direction(f, knots, m)
     if track_iterates:
         return knots, S, approx, iteration, iterates
 
@@ -202,12 +203,12 @@ def descent_algo(theta_start, f, a, b, m, k, track_iterates=False):
 
 
 if __name__ == "__main__":
-    function_name = "exp_sin_cos"
+    function_name = "sin3t"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
     a, b = test_functions.INTERVALS[function_name]
     k = 2
-    m = 1
+    m = 2
 
     approx, x_min = nurnberger_mod.discontinuous_spline(
         f, a, b, k, m
@@ -223,9 +224,24 @@ if __name__ == "__main__":
         points=A.basis,
         f_label=f_label,
         approximation_label=rf"$S_{{{m}}}(t)$",
-        file_name=f"z_{function_name}_k{k}_m{m}_final",
+        title=f"Descent algorithm for {f_label} with {k} internal knots and degree {m}",
+        file_name=f"z_{function_name}_k{k}_m{m}_test",
     )
 
+    npz_path = Path(f"psi_surfaces/psi_surface_{function_name}_k{k}_m{m}.npz")
+    if npz_path.exists():
+        data = np.load(npz_path)
+        theta_1_values = data["theta_1_values"]
+        theta_2_values = data["theta_2_values"]
+        psi_values = data["psi_values"]
+    plotting.plot_objective_psi_contour(
+        theta_1_values,
+        theta_2_values,
+        psi_values,
+        theta_found=new_knots[1:-1],
+        theta_path=iterates,
+        file_name=f"z_psi_path_contour_{function_name}_k{k}_m{m}",
+    )
     # knots = np.linspace(a, x_min, k + 1)
     # knots = np.concatenate([knots, [b]])
 

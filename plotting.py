@@ -272,7 +272,6 @@ def plot_duo(
     ax1.set_xlabel(r"$t$", fontsize=15)
 
     ax2.set_xlabel(r"$t$", fontsize=15)
-    # ax2.set_ylabel(deviation_label, fontsize=15)
 
     for ax in (ax1, ax2):
         ax.legend(
@@ -299,6 +298,7 @@ def plot_report(
     f_label=r"$f(t)$",
     approximation_label=r"$S(t)$",
     points_label=None,
+    title=None,
     file_name=None,
     figsize=(7, 5),
 ):
@@ -323,6 +323,9 @@ def plot_report(
         ncol=2,
         frameon=False,
     )
+
+    if title is not None:
+        fig.suptitle(title, fontsize=16)
 
     fig.tight_layout()
     _save_figure(fig, file_name)

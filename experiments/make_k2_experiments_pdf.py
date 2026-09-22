@@ -77,7 +77,7 @@ def add_results_text(page, record, rect):
         ("Initial max deviation", "initialmaxdeviation"),
         ("Initial knots", "theta_initial"),
         ("Nürnberger start", "thetastart"),
-        ("Theta opt", "thetahat"),
+        ("Theta opt", "thetaopt"),
         ("Final max deviation", "finalmaxdeviation"),
         ("Iterations", "iterations"),
     ]
