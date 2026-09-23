@@ -97,3 +97,7 @@ INTERVALS = {
     "g": (-1, 1),
     "f_g": (-1, 1),
 }
+
+FUNCTION_LABELS = {
+    name: rf"$f_{{{i}}}$" for i, name in enumerate(TEST_FUNCTIONS, start=1)
+}

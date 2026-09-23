@@ -1,4 +1,3 @@
-# rename file
 # GRA and GRAFT (unmodified)
 import numpy as np
 
@@ -364,9 +363,10 @@ if __name__ == "__main__":
         result["approximation"],
         points=result["approximation"].basis,
         f_label=r"$f_{1}(t)$",
-        deviation_label=rf"$f_{1}(t)-S_{{{m}}}(t)$",
-        approximation_label=rf"$S_{{{m}}}(t)$",
-        # approximation_title="f and current iterate ",
-        # deviation_title="Current deviation at step r",
+        deviation_label=rf"$f_{1}(t)-s^r_{{{m}}}(t)$",
+        approximation_label=rf"$s^r_{{{m}}}(t)$",
+        approximation_title=rf"Current fixed-knot spline $s^r_{{{m}}}$",
+        deviation_title=rf"Corresponding deviation $f_1-s^r_{{{m}}}$",
+        highlightknots=[-0.5],
         file_name=f"z_duo_orig_f1_{function_name}_k{k}_m{m}",
     )

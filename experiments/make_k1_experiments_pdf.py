@@ -12,9 +12,9 @@ sys.path.insert(0, str(ROOT))
 
 import test_functions
 
-PLOTS = ROOT / "plots" / "2026-09-20"
+PLOTS = ROOT / "plots" / "2026-09-23"
 K1_RESULTS = SCRIPT_DIR / "k1results.csv"
-OUTPUT = SCRIPT_DIR / "experiment_report.pdf"
+OUTPUT = SCRIPT_DIR / "experiment_report_k1.pdf"
 
 PAGE = pymupdf.paper_rect("a4")
 PAGE_WIDTH = PAGE.height
@@ -135,15 +135,15 @@ def add_k1_page(document, record):
     prefix = f"{function}_k{k}_m{m}"
 
     plots = [
+        PLOTS / f"{prefix}_equidistant.pdf",
         PLOTS / f"{prefix}_initial.pdf",
-        PLOTS / f"psi_{prefix}_nurnberger_points.pdf",
         PLOTS / f"psi_opt_path_{prefix}.pdf",
         PLOTS / f"{prefix}_final.pdf",
     ]
 
     titles = [
+        "Equidistant approximation",
         "Initial approximation",
-        "Nürnberger points",
         "Descent path",
         "Final approximation",
     ]

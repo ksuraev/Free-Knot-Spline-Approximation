@@ -25,11 +25,6 @@ experiments = [
     for m in range(1, 4)
 ]
 
-function_labels = {
-    name: rf"$f_{{{i}}}$"
-    for i, name in enumerate(test_functions.TEST_FUNCTIONS, start=1)
-}
-
 results = []
 
 with tqdm(experiments, desc="Experiments", unit="case") as progress:
@@ -40,29 +35,53 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
         a, b = test_functions.INTERVALS[function]
 
         # Compute initial spline approximation based on equidistant knots
-        initial_theta = (a + b) / 2
+        equidistant_theta = (a + b) / 2
+        equidistant_result = one_knot_approx.psi(f, a, b, equidistant_theta, m, k + 1)
+        equidistant_approx = equidistant_result["approximation"]
+        equidistant_max_deviation = abs(equidistant_approx.maxdeviation()[2])
+        equidistant_d_max = equidistant_result["d_max"]
+        equidistant_basis = equidistant_approx.basis
+        equidistant_alternance_points = equidistant_approx.alternancesequence()[0]
+        equidistant_status = equidistant_result["optimal"]
+        equidistant_case = equidistant_result["case"]
+
+        # Plot the equidistant spline approximation
+        plotting.plot_report(
+            equidistant_approx,
+            points=equidistant_basis,
+            f_label=test_functions.FUNCTION_LABELS[function],
+            approximation_label=rf"$s^{{\mathrm{{eq}}}}_{{{m}}}(t)$",
+            title="Equidistant-knot approximation",
+            file_name=f"{function}_k{k}_m{m}_equidistant",
+        )
+
+        # Compute initial discontinuous spline approximation and find starting theta
+        initial_approx, initial_theta = nurnberger_mod.discontinuous_spline(
+            f, a, b, k, m
+        )
+        if initial_theta is None:
+            initial_theta = initial_approx.g.knots[1]
+
         initial_result = one_knot_approx.psi(f, a, b, initial_theta, m, k + 1)
         initial_approx = initial_result["approximation"]
         initial_max_deviation = abs(initial_approx.maxdeviation()[2])
         initial_d_max = initial_result["d_max"]
         initial_basis = initial_approx.basis
-        initial_alternance_points = initial_approx.alternancesequence()[0]
+        initial_alternance_points = initial_result[
+            "approximation"
+        ].alternancesequence()[0]
         initial_status = initial_result["optimal"]
         initial_case = initial_result["case"]
 
-        # Plot the initial spline approximation
-        # plotting.plot_report(
-        #     initial_approx,
-        #     points=initial_basis,
-        #     f_label=f_label,
-        #     approximation_label=rf"$S_{{{m},{k}}}(t)$",
-        #     file_name=f"{function}_k{k}_m{m}_initial",
-        # )
-
-        # Compute initial discontinuous spline approximation and find starting theta
-        approx, theta_start = nurnberger_mod.discontinuous_spline(f, a, b, k, m)
-        if theta_start is None:
-            theta_start = approx.g.knots[1]
+        # plot initial spline approximation
+        plotting.plot_report(
+            initial_approx,
+            points=initial_basis,
+            f_label=test_functions.FUNCTION_LABELS[function],
+            approximation_label=rf"$s^{0}_{{{m}}}(t)$",
+            title=r"Initial approximation at $\theta^{\mathrm{mod}}$",
+            file_name=f"{function}_k{k}_m{m}_initial",
+        )
 
         # Use precomputed psi(theta) values from the .npz file to get thetas and psi_values
         npz_path = Path(f"psi_surfaces/psi_surface_{function}_k{k}_m{m}.npz")
@@ -84,20 +103,21 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
 
         # Find optimal theta
         theta_opt, result, iterations, theta_path = one_knot_approx.find_optimal_theta(
-            f, a, b, m, k + 1, theta_start
+            f, a, b, m, k + 1, initial_theta
         )
         psi_opt = result["d_max"]
 
         nurnberger_original = nurnberger.run(f, a, b, k, m).g.knots[1]
-        nurnberger_modified = theta_start
+        nurnberger_modified = initial_theta
 
-        # plotting.plot_objective_psi(
-        #     thetas,
-        #     psi_values,
-        #     nurnbergers_orig_point=nurnberger_original,
-        #     nurnbergers_mod_point=nurnberger_modified,
-        #     file_name=f"psi_{function}_k{k}_m{m}_nurnberger_points",
-        # )
+        plotting.plot_objective_psi(
+            thetas,
+            psi_values,
+            nurnbergers_orig_point=nurnberger_original,
+            nurnbergers_mod_point=nurnberger_modified,
+            title="Nürnberger initial points",
+            file_name=f"psi_{function}_k{k}_m{m}_nurnberger_points",
+        )
 
         # Plot psi(theta) again, this time highlighting the optimal theta found by the algorithm
         # plotting.plot_objective_psi(
@@ -109,14 +129,15 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
         # )
 
         # Plot psi(theta) again, this time highlighting the optimal theta found by the algorithm and the path taken by the algorithm
-        # plotting.plot_objective_psi(
-        #     thetas,
-        #     psi_values,
-        #     theta_found=theta_opt,
-        #     psi_found=psi_opt,
-        #     theta_path=theta_path,
-        #     file_name=f"psi_opt_path_{function}_k{k}_m{m}",
-        # )
+        plotting.plot_objective_psi(
+            thetas,
+            psi_values,
+            theta_found=theta_opt,
+            psi_found=psi_opt,
+            theta_path=theta_path,
+            title=r"Descent path on $\overline{\Psi}(\theta)$",
+            file_name=f"psi_opt_path_{function}_k{k}_m{m}",
+        )
 
         final_approx = result["approximation"]
         final_basis = final_approx.basis
@@ -129,24 +150,30 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
         final_case = result["case"]
 
         # Plot the final spline approximation
-        # plotting.plot_report(
-        #     result["approximation"],
-        #     points=final_basis,
-        #     f_label=f_label,
-        #     approximation_label=rf"$S_{{{m},{k}}}(t)$",
-        #     file_name=f"{function}_k{k}_m{m}_final",
-        # )
+        plotting.plot_report(
+            result["approximation"],
+            points=final_basis,
+            f_label=test_functions.FUNCTION_LABELS[function],
+            approximation_label=rf"$s^*_{{{m}}}(t)$",
+            title="Final approximation",
+            file_name=f"{function}_k{k}_m{m}_final",
+        )
 
         result = {
             "function": function,
             "m": m,
             "k": k,
+            "equidistantmaxdeviation": equidistant_max_deviation,
+            "equidistantdmax": equidistant_d_max,
+            "equidistantstatus": equidistant_status,
+            "equidistantcase": equidistant_case,
+            "equidistanttheta": equidistant_theta,
             "initialstatus": initial_status,
             "initialcase": initial_case,
             "initialtheta": initial_theta,
             "initialmaxdeviation": initial_max_deviation,
             "initialdmax": initial_d_max,
-            "thetastart": theta_start,
+            "thetastart": initial_theta,
             "thetahat": theta_opt,
             "psithetahat": psi_opt,
             "thetasamplemin": theta_sample_min,
@@ -186,6 +213,7 @@ for i, row in df.iterrows():
         f"{row['function_label']} & "
         f"{int(row['m'])} & "
         f"{int(row['k'])} & "
+        f"{row['equidistantdmax']:.4f} & "
         f"{row['initialdmax']:.4f} & "
         f"{row['finaldmax']:.4f} & "
         f"{int(row['iterations'])} \\\\"
@@ -196,5 +224,5 @@ for i, row in df.iterrows():
     if next_function != row["function"] and i + 1 < len(df):
         rows.append(r"\addlinespace[0.5em]")
 
-with open("k1results_rows.tex", "w") as f:
+with open("experiments/k1results_rows.tex", "w") as f:
     f.write("\n".join(rows))

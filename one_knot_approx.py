@@ -1,6 +1,7 @@
 import numpy as np
 
 import nadia_mod
+import nurnberger
 import nurnberger_mod
 import plotting
 import remez
@@ -276,50 +277,52 @@ if __name__ == "__main__":
         theta_min = approx.g.knots[1]
 
     # Find optimal theta
-    theta_opt, psi_result, iterations, theta_path = find_optimal_theta(
-        f, a, b, m, n, theta_min, verbose=True
-    )
-
-    def case(case_num):
-        if case_num == 1:
-            return "two intervals"
-        elif case_num == 2:
-            return "fixed left"
-        elif case_num == 3:
-            return "fixed right"
-
-    status = (
-        f"optimal, {case(psi_result['case'])}"
-        if psi_result["optimal"]
-        else f"not optimal, {case(psi_result['case'])}"
-    )
-
-    # Load precomputed psi(theta) values from the .npz file
-    # data = np.load(f"psi_surface_{function_name}_k{k}_m{m}.npz")
-    # thetas = data["theta_values"]
-    # psi_values = data["psi_values"]
-
-    # plotting.plot_objective_psi(
-    #     thetas,
-    #     psi_values,
-    #     theta_found=theta_opt,
-    #     psi_found=psi_result["d_max"],
-    #     theta_path=theta_path,
-    #     file_name=f"oneknotapprox_psi_{function_name}_k{k}_m{m}",
+    # theta_opt, psi_result, iterations, theta_path = find_optimal_theta(
+    #     f, a, b, m, n, theta_min, verbose=True
     # )
 
-    plotting.plot_duo(
-        psi_result["approximation"],
-        points=psi_result["approximation"].basis,
-        f_label=f_label,
-        approximation_label=rf"$S_{{{m},{k}}}(t)$",
-        title=(
-            f"Degree-{m} spline approximation of {f_label}. "
-            f"{k} internal knots ({status}). "
-            f"Max abs deviation: {psi_result['d_max']:.5f}."
-        ),
-        file_name=f"z_oneknotapprox_duo_alg_{function_name}_k{k}_m{m}",
+    # def case(case_num):
+    #     if case_num == 1:
+    #         return "two intervals"
+    #     elif case_num == 2:
+    #         return "fixed left"
+    #     elif case_num == 3:
+    #         return "fixed right"
+
+    # status = (
+    #     f"optimal, {case(psi_result['case'])}"
+    #     if psi_result["optimal"]
+    #     else f"not optimal, {case(psi_result['case'])}"
+    # )
+
+    # Load precomputed psi(theta) values from the .npz file
+    data = np.load(f"psi_surfaces/psi_surface_{function_name}_k{k}_m{m}.npz")
+    thetas = data["theta_values"]
+    psi_values = data["psi_values"]
+
+    nurnberger_original = nurnberger.run(f, a, b, k, m).g.knots[1]
+
+    plotting.plot_objective_psi(
+        thetas,
+        psi_values,
+        nurnbergers_orig_point=nurnberger_original,
+        nurnbergers_mod_point=theta_min,
+        # title=rf"Objective function $\overline{{\Psi}}(\theta_1)$",
+        file_name=f"z_psi_{function_name}_k{k}_m{m}_both_nurn_pts",
     )
+
+    # plotting.plot_duo(
+    #     psi_result["approximation"],
+    #     points=psi_result["approximation"].basis,
+    #     f_label=f_label,
+    #     approximation_label=rf"$S_{{{m},{k}}}(t)$",
+    #     title=(
+    #         f"Degree-{m} spline approximation of {f_label}. "
+    #         f"{k} internal knots ({status}). "
+    #         f"Max abs deviation: {psi_result['d_max']:.5f}."
+    #     ),
+    #     file_name=f"z_oneknotapprox_duo_alg_{function_name}_k{k}_m{m}",
+    # )
 
     # plotting.plot_report(
     #     psi_result["approximation"],

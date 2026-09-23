@@ -49,7 +49,6 @@ def subroutine(f, x_i, b, m, d_n, max_iter):
         x_min = approx.basis[-1]
     else:
         x_min = alt_pts[m + 1]
-
     return x_min
 
 
@@ -121,14 +120,14 @@ def discontinuous_spline(f, a, b, k, m, max_iter=100, verbose=False):
 
 
 if __name__ == "__main__":
-    function_name = "g"
+    function_name = "cos_weird"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
-    a, b = 0, 12
+    a, b = test_functions.INTERVALS[function_name]
     k = 1  # number of free knots (not including a and b)
     m = 1  # degree of polynomial to fit
 
-    approx, x_min = discontinuous_spline(f, a, b, k, m)
+    approx, x_min = discontinuous_spline(f, a, b, k, m, verbose=True)
 
     # plotting.plot_duo(
     #     approx,

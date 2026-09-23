@@ -8,17 +8,14 @@ from tqdm import tqdm
 SCRIPT_DIR = Path(__file__).resolve().parent
 ROOT = SCRIPT_DIR.parent
 
-results_path = Path("experiments/k2results.csv")
+results_path = Path("experiments/knresults.csv")
 
 if results_path.exists():
     results_path.unlink()
 
 sys.path.insert(0, str(ROOT))
 
-import compute_psi_samples
-
 import extras
-import nurnberger
 import nurnberger_mod
 import plotting
 import test_functions
@@ -26,7 +23,7 @@ import test_functions
 experiments = [
     (function, k, m)
     for function in test_functions.TEST_FUNCTIONS
-    for k in range(2, 3)
+    for k in range(3, 5)
     for m in range(1, 4)
 ]
 results = []
@@ -43,7 +40,7 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
         equidistant_z, equidistant_approx, _ = extras.solve_simplex(
             f, equidistant_knots, m
         )
-        # Plot the equidistant spline approximation
+        # Plot the initial spline approximation
         plotting.plot_report(
             equidistant_approx,
             points=equidistant_approx.basis,
@@ -58,7 +55,6 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
         if len(initial_knots) != k + 2:
             initial_knots = extras.insert_extra_knots(initial_knots, k, a, b)
         initial_z, initial_approx, _ = extras.solve_simplex(f, initial_knots, m)
-        # Plot the initial spline approximation
         plotting.plot_report(
             initial_approx,
             points=initial_approx.basis,
@@ -68,82 +64,9 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
             file_name=f"{function}_k{k}_m{m}_initial",
         )
 
-        # Use precomputed psi(theta) values from the .npz file to get thetas and psi_values
-        npz_path = Path(f"psi_surfaces/psi_surface_{function}_k{k}_m{m}.npz")
-        if npz_path.exists():
-            data = np.load(npz_path)
-            theta_1_values = data["theta_1_values"]
-            theta_2_values = data["theta_2_values"]
-            psi_values = data["psi_values"]
-
-        else:
-            theta_1_values, theta_2_values, psi_values = (
-                compute_psi_samples.compute_psi_samples_2d(
-                    f, a, b, m, a + 0.1, b - 0.1, a + 0.1, b - 0.1
-                )
-            )
-            np.savez(
-                npz_path,
-                theta_1_values=theta_1_values,
-                theta_2_values=theta_2_values,
-                psi_values=psi_values,
-            )
-
-        # # plot psi(theta) as 3d surface
-        # plotting.plot_objective_psi_3d(
-        #     theta_1_values,
-        #     theta_2_values,
-        #     psi_values,
-        #     title=r"Objective surface $\overline{\Psi}(\theta)$",
-        #     file_name=f"psi_{function}_k{k}_m{m}",
-        # )
-
-        # # plot psi(theta) as contour plot
-        # plotting.plot_objective_psi_contour(
-        #     theta_1_values,
-        #     theta_2_values,
-        #     psi_values,
-        #     title=r"Objective contours $\overline{\Psi}(\theta)$",
-        #     file_name=f"psi_contour_{function}_k{k}_m{m}",
-        # )
-
-        # Plot psi(theta) as contour plot with Nurnberger's original and modified points
-        nurnberger_original = nurnberger.run(f, a, b, k, m).g.knots[1:-1]
-
-        plotting.plot_objective_psi_contour(
-            theta_1_values,
-            theta_2_values,
-            psi_values,
-            nurnbergers_orig_point=nurnberger_original,
-            nurnbergers_mod_point=initial_knots[1:-1],
-            title="Nürnberger initial points",
-            file_name=f"psi_contour_{function}_k{k}_m{m}_nurnberger_points",
-        )
-
         # Find optimal knots
         opt_knots, S, final_approx, iterations, final_z, iterates = extras.descent_algo(
             initial_knots[1:-1], f, a, b, m, k, track_iterates=True
-        )
-
-        # Plot psi(theta) again, this time highlighting the optimal theta found by the algorithm and the path taken by the algorithm
-        plotting.plot_objective_psi_3d(
-            theta_1_values,
-            theta_2_values,
-            psi_values,
-            theta_found=opt_knots[1:-1],
-            theta_path=iterates,
-            title=r"Descent path on $\overline{\Psi}(\theta)$",
-            file_name=f"psi_path_{function}_k{k}_m{m}",
-        )
-
-        plotting.plot_objective_psi_contour(
-            theta_1_values,
-            theta_2_values,
-            psi_values,
-            theta_found=opt_knots[1:-1],
-            theta_path=iterates,
-            title=r"Descent path on $\overline{\Psi}(\theta)$",
-            file_name=f"psi_path_contour_{function}_k{k}_m{m}",
         )
 
         # Plot the final spline approximation
@@ -209,5 +132,5 @@ for i, row in df.iterrows():
     if next_function != row["function"] and i + 1 < len(df):
         rows.append(r"\addlinespace[0.5em]")
 
-with open("experiments/k2results_rows.tex", "w") as f:
+with open("experiments/knresults_rows.tex", "w") as f:
     f.write("\n".join(rows))

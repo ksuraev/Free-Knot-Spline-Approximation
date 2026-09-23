@@ -126,5 +126,6 @@ if __name__ == "__main__":
             points=approx.basis,
             f_label=r"$f_{1}(t)$",
             approximation_label=rf"$S_{{{m}}}(t)$",
-            file_name=f"nberger_f1_{function_name}_a{a}_b{b}_k{k}_m{m}.png",
+            title=rf"$k={k},\ m={m}$",
+            file_name=f"nberger_f1_{function_name}_a{a}_b{b}_k{k}_m{m}",
         )

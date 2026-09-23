@@ -124,5 +124,6 @@ if __name__ == "__main__":
             points=approx.basis,
             f_label=r"$f_{1}(t)$",
             approximation_label=rf"$P_{{{m}}}(t)$",
+            title=rf"$m={m}$",
             file_name=f"remez_f1_{function_name}_m{m}",
         )

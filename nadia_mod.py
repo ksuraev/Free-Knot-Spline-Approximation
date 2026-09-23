@@ -141,27 +141,29 @@ def gra(
 
 if __name__ == "__main__":
     # evaluating psi section example
-    function_name = "g"
-    f, f_label = test_functions.TEST_FUNCTIONS[function_name]
+    # function_name = "g"
+    # f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
-    a, b = -1, 1
-    k = 3  # number of internal fixed knots
-    m = 1  # degree of polynomial to fit in each subinterval
-    n = k + 1  # number of subintervals
-    result = nadia_original.gra(
-        f, np.linspace(a, b, k + 2), m, n, exchange_function=exchange, verbose=True
-    )
-    status = "Optimal" if result["exit_type"] == 1 else "Not optimal"
+    # a, b = -1, 1
+    # k = 3  # number of internal fixed knots
+    # m = 1  # degree of polynomial to fit in each subinterval
+    # n = k + 1  # number of subintervals
+    # result = nadia_original.gra(
+    #     f, np.linspace(a, b, k + 2), m, n, exchange_function=exchange, verbose=True
+    # )
+    # status = "Optimal" if result["exit_type"] == 1 else "Not optimal"
 
-    plotting.plot_duo(
-        result["approximation"],
-        points=result["approximation"].basis,
-        f_label=r"$f_{1}(t)$",
-        deviation_label=rf"$f_{1}(t)-S_{{{m}}}(t)$",
-        approximation_label=rf"$S_{{{m}}}(t)$",
-        approximation_title=f"{status} approximation",
-        file_name=f"z_duo_orig_f1_{function_name}_k{k}_m{m}",
-    )
+    # plotting.plot_duo(
+    #     result["approximation"],
+    #     points=result["approximation"].basis,
+    #     f_label=r"$f_{1}(t)$",
+    #     deviation_label=rf"$f_{1}(t)-s^*_{{{m}}}(t)$",
+    #     approximation_label=rf"$s^*_{{{m}}}(t)$",
+    #     approximation_title=rf"Best fixed-knot spline $s^*_{{{m}}}$",
+    #     deviation_title=rf"Corresponding deviation $f_1-s^*_{{{m}}}$",
+    #     highlightknots=[-0.5, 0.5],
+    #     file_name=f"z_duo_mod_f1_{function_name}_k{k}_m{m}",
+    # )
 
     # evaluating graft section example
     function_name = "cos_weird"
@@ -182,7 +184,21 @@ if __name__ == "__main__":
         result["approximation"],
         points=result["approximation"].basis,
         f_label=r"$f_{2}(t)$",
-        deviation_label=rf"$f_{2}(t)-S_{{{m}}}(t)$",
-        approximation_label=rf"$S_{{{m}}}(t)$",
-        file_name=f"z_duo_f2_fixedtail_mod_{function_name}_k{k}_m{m}",
+        deviation_label=rf"$f_{2}(t)-s^*_{{{m}}}(t)$",
+        approximation_label=rf"$s^*_{{{m}}}(t)$",
+        approximation_title=rf"Best fixed-knot spline $s^*_{{{m}}}$",
+        deviation_title=rf"Corresponding deviation $f_{2}-s^*_{{{m}}}$",
+        file_name=f"z_duo_f2_fixedtail_mod_{function_name}_k{k}_m{m}_fixed",
     )
+
+    # plotting.plot_duo(
+    #     result["approximation"],
+    #     points=result["approximation"].basis,
+    #     f_label=r"$f_{2}(t)$",
+    #     deviation_label=rf"$f_{2}(t)-s^r_{{{m}}}(t)$",
+    #     approximation_label=rf"$s^r_{{{m}}}(t)$",
+    #     approximation_title=rf"Current fixed-knot spline $s^r_{{{m}}}$",
+    #     deviation_title=rf"Corresponding deviation $f_{2}-s^r_{{{m}}}$",
+    #     highlightdeviation=[12],
+    #     file_name=f"z_duo_f2_fixedtail_mod_{function_name}_k{k}_m{m}_broken",
+    # )

@@ -6,6 +6,7 @@ import matplotlib as mpl
 mpl.use("pgf")
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.ticker import MaxNLocator
 
 import Spline
 
@@ -129,7 +130,7 @@ def _plot_knots(ax, approx):
         ax.axvline(knot, linewidth=1.5, zorder=0, color=KNOT_COLOUR)
 
 
-def _plot_basis_lines(ax, approx):
+def _plot_basis_lines(ax, approx, colour=POINT_COLOUR):
     basis_points = _flatten_points(approx.basis)
 
     for point in basis_points:
@@ -142,14 +143,14 @@ def _plot_basis_lines(ax, approx):
         ax.plot(
             [point, point],
             [0, y_dev],
-            color="black",
+            color=colour,
             linestyle="--",
             linewidth=1,
             alpha=0.8,
         )
 
 
-def _plot_deviation_markers(ax, approx, points):
+def _plot_deviation_markers(ax, approx, points, colour=POINT_COLOUR):
     """Plot function points and their deviations from the approximation."""
 
     j = 0
@@ -176,13 +177,13 @@ def _plot_deviation_markers(ax, approx, points):
                 y_f = approx.f(point)
 
                 # Point on the function
-                ax.scatter(point, y_f, color=POINT_COLOUR, s=15, zorder=5)
+                ax.scatter(point, y_f, color=colour, s=15, zorder=5)
 
                 # Vertical deviation
                 ax.plot(
                     [point, point],
                     [y_approx, y_f],
-                    color=POINT_COLOUR,
+                    color=colour,
                     linestyle="--",
                     linewidth=1,
                     alpha=0.8,
@@ -199,13 +200,13 @@ def _plot_deviation_markers(ax, approx, points):
             y_f = approx.f(point)
 
             # Point on the function.
-            ax.scatter(point, y_f, color=POINT_COLOUR, s=15, zorder=5)
+            ax.scatter(point, y_f, color=colour, s=15, zorder=5)
 
             # Vertical deviation.
             ax.plot(
                 [point, point],
                 [y_approx, y_f],
-                color=POINT_COLOUR,
+                color=colour,
                 linestyle="--",
                 linewidth=1,
                 alpha=0.8,
@@ -240,6 +241,53 @@ def _save_figure(fig, file_name):
     plt.close(fig)
 
 
+def _highlight_knots(ax, approx, knots):
+    """Highlight specific knots on the plot."""
+    for knot in knots:
+        ax.axvline(knot, linewidth=1.2, zorder=0, color="crimson", linestyle="-")
+
+
+def _highlight_deviation_markers(ax, approx, points, left_plot=True):
+    """Highlight specific deviation markers on the plot."""
+    points = _flatten_points(points)
+    if left_plot:
+        for point in points:
+            y_dev = approx.deviation(point)
+            # Highlight the point on the function
+            ax.scatter(point, approx.f(point), color="crimson", s=15, zorder=6)
+            # Highlight the vertical deviation line
+            ax.plot(
+                [point, point],
+                [approx.g(point), approx.f(point)],
+                color="crimson",
+                linestyle="--",
+                linewidth=1.2,
+                zorder=5,
+            )
+    else:
+        for point in points:
+            y_dev = approx.f(point) - approx.g(point)
+
+            print(point, y_dev)
+
+            ax.scatter(
+                point,
+                y_dev,
+                color="crimson",
+                s=15,
+                zorder=6,
+            )
+
+            ax.plot(
+                [point, point],
+                [0, y_dev],
+                color="crimson",
+                linestyle="--",
+                linewidth=1.2,
+                zorder=5,
+            )
+
+
 def plot_duo(
     approx,
     points=None,
@@ -248,6 +296,8 @@ def plot_duo(
     approximation_label=r"$S(t)$",
     approximation_title=None,
     deviation_title=None,
+    highlightknots=None,
+    highlightdeviation=None,
     title=None,
     file_name=None,
 ):
@@ -264,14 +314,20 @@ def plot_duo(
     # Knots
     _plot_knots(ax1, approx)
     _plot_knots(ax2, approx)
+    if highlightknots is not None:
+        _highlight_knots(ax1, approx, highlightknots)
+        _highlight_knots(ax2, approx, highlightknots)
 
     # Basis / alternance points
     if points is not None:
-        _plot_deviation_markers(ax1, approx, points)
-        _plot_basis_lines(ax2, approx)
+        _plot_deviation_markers(ax1, approx, points, colour="black")
+        _plot_basis_lines(ax2, approx, colour="black")
+
+    if highlightdeviation is not None:
+        _highlight_deviation_markers(ax1, approx, highlightdeviation, left_plot=True)
+        _highlight_deviation_markers(ax2, approx, highlightdeviation, left_plot=False)
 
     ax1.set_xlabel(r"$t$", fontsize=15)
-
     ax2.set_xlabel(r"$t$", fontsize=15)
 
     ax1.set_title(approximation_title, fontsize=15)
@@ -279,7 +335,7 @@ def plot_duo(
 
     for ax in (ax1, ax2):
         ax.legend(
-            fontsize=20,
+            fontsize=18,
             loc="upper center",
             bbox_to_anchor=(0.5, -0.15),
             ncol=2,
@@ -287,9 +343,8 @@ def plot_duo(
         )
 
     _style_axes(ax1, ax2, labelsize=15)
-
-    if title is not None:
-        fig.suptitle(title)
+    ax1.set_title(approximation_title, fontsize=22, pad=20)
+    ax2.set_title(deviation_title, fontsize=22, pad=20)
 
     fig.tight_layout()
     _save_figure(fig, file_name)
@@ -329,7 +384,7 @@ def plot_report(
     )
 
     if title is not None:
-        fig.suptitle(title, fontsize=16)
+        ax.set_title(title, fontsize=22, pad=12)
 
     fig.tight_layout()
     _save_figure(fig, file_name)
@@ -370,6 +425,7 @@ def plot_objective_psi(
     nurnbergers_orig_point=None,
     nurnbergers_mod_point=None,
     file_name=None,
+    title=None,
     figsize=(7, 5),
 ):
     """Plot precomputed psi(theta) values and optionally the algorithm result."""
@@ -406,11 +462,7 @@ def plot_objective_psi(
     ax.set_ylim(psi_values.min() - 0.08 * y_range, psi_values.max() + 0.03 * y_range)
     y_bottom = ax.get_ylim()[0]
 
-    theta_min_label = (
-        rf"$\theta_{{\min}}={theta_min:.3f}$"
-        if nurnbergers_mod_point is not None or nurnbergers_orig_point is not None
-        else rf"$\theta_{1}^*={theta_min:.3f}$" rf"$,\ \psi^*={psi_min:.3f}$"
-    )
+    theta_min_label = rf"$\theta_{1}^*={theta_min:.3f}$"
 
     ax.vlines(
         theta_min,
@@ -452,10 +504,7 @@ def plot_objective_psi(
             s=60,
             linewidths=2,
             zorder=8,
-            label=(
-                rf"$\hat{{\theta}}={theta_found:.3f}$"
-                rf"$,\ \hat{{\psi}}={psi_found:.3f}$"
-            ),
+            label=(rf"$\hat{{\theta}}={theta_found:.3f}$"),
         )
 
     # Plot Nurnberger's point if provided
@@ -480,7 +529,7 @@ def plot_objective_psi(
             s=40,
             linewidths=2,
             zorder=6,
-            label=rf"$\theta_{{\min}}={nurnbergers_mod_point:.3f}$",
+            label=rf"$\theta_1^{{\mathrm{{mod}}}}={nurnbergers_mod_point:.3f}$",
         )
     # Path taken by the algorithm
     if theta_path is not None:
@@ -509,6 +558,8 @@ def plot_objective_psi(
     ax.set_ylabel(r"$\psi(\theta_1)$", fontsize=15)
 
     _style_axes(ax, labelsize=14)
+    if title is not None:
+        ax.set_title(title, fontsize=18)
 
     ax.legend(
         fontsize=16,
@@ -521,7 +572,7 @@ def plot_objective_psi(
         ),
         frameon=False,
         handletextpad=0.4,
-        columnspacing=1.0,
+        columnspacing=1,
         handlelength=1.5,
     )
 
@@ -539,6 +590,7 @@ def plot_objective_psi_contour(
     theta_path=None,
     nurnbergers_orig_point=None,
     nurnbergers_mod_point=None,
+    title=None,
     file_name=None,
     figsize=(7, 5),
 ):
@@ -684,6 +736,9 @@ def plot_objective_psi_contour(
 
     _style_axes(ax, labelsize=14)
 
+    if title is not None:
+        ax.set_title(title, fontsize=22, pad=12)
+
     handles, labels = ax.get_legend_handles_labels()
     if handles:
         ax.legend(
@@ -713,6 +768,7 @@ def plot_objective_psi_3d(
     theta_found=None,
     theta_path=None,
     file_name=None,
+    title=None,
     figsize=(7, 5),
 ):
     """Plot a precomputed two-knot objective surface"""
@@ -749,7 +805,7 @@ def plot_objective_psi_3d(
 
     ax.set_proj_type("ortho")
     ax.view_init(elev=28, azim=-25)
-    ax.set_box_aspect((1, 1, 0.55), zoom=1.05)
+    ax.set_box_aspect((1.1, 1, 0.55), zoom=1.05)
 
     ax.set_xlim(x_min, x_max)
     ax.set_ylim(y_min, y_max)
@@ -761,7 +817,8 @@ def plot_objective_psi_3d(
         surface_values,
         cmap="coolwarm",
         antialiased=True,
-        alpha=0.8,
+        alpha=1 if theta_path is None and theta_found is None else 0.8,
+        zorder=1,
     )
     # Path taken by the algorithm
     if theta_path is not None:
@@ -790,7 +847,7 @@ def plot_objective_psi_3d(
             path_psi[:-1],
             color="black",
             marker="o",
-            s=2,
+            s=10,
             depthshade=False,
             zorder=11,
         )
@@ -817,7 +874,7 @@ def plot_objective_psi_3d(
             psi_found,
             marker="x",
             color="black",
-            s=10,
+            s=15,
             linewidths=1,
             depthshade=False,
             zorder=12,
@@ -837,16 +894,23 @@ def plot_objective_psi_3d(
 
     ax.set_xlabel(r"$\theta_1$", fontsize=14, labelpad=8)
     ax.set_ylabel(r"$\theta_2$", fontsize=14, labelpad=8)
-    ax.set_zlabel(r"$\psi(\theta_1,\theta_2)$", fontsize=14, labelpad=10)
+    ax.set_zlabel(r"$\psi(\theta_1,\theta_2)$", fontsize=14, labelpad=6)
 
-    ax.tick_params(axis="x", labelsize=11)
-    ax.tick_params(axis="y", labelsize=11)
-    ax.tick_params(axis="z", labelsize=11)
+    ax.xaxis.set_major_locator(MaxNLocator(5))
+    ax.yaxis.set_major_locator(MaxNLocator(5))
+    ax.zaxis.set_major_locator(MaxNLocator(5))
+
+    ax.tick_params(axis="x", labelsize=11, pad=1)
+    ax.tick_params(axis="y", labelsize=11, pad=1)
+    ax.tick_params(axis="z", labelsize=11, pad=1)
+
+    if title is not None:
+        ax.set_title(title, fontsize=16, pad=5, x=0.5)
 
     handles, labels = ax.get_legend_handles_labels()
     if handles:
         ax.legend(
-            fontsize=16,
+            fontsize=20,
             loc="upper center",
             bbox_to_anchor=(0.5, -0.12),
             ncol=2,

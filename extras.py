@@ -137,6 +137,7 @@ def armijo(f, S, knots, m, d, rho=0.5, c=0.1, verbose=False):
     # Initialise the step size
     alpha = 100.0
     d_full = np.concatenate([[0], d, [0]])
+
     # directional_deriv = directional_derivative(f, knots, m, d_full)
     # print(f"Directional derivative: {directional_deriv:.5f}")
     curr_knots = knots.copy()
@@ -181,52 +182,85 @@ def descent_algo(theta_start, f, a, b, m, k, track_iterates=False):
     if track_iterates:
         iterates = [theta_start.copy()]
 
-    for iteration in range(10):
-        d, S, approx, dev = get_direction(f, knots, m)
-        print(dev)
-        knot_direction = d[-k:]
+    previous_norm = None
+    unchanged_count = 0
 
-        print(f"{iteration}: norm d = {np.linalg.norm(d):.5f}")
-        if np.linalg.norm(d) < 1e-5:
+    for iteration in range(100):
+        d, S, approx, dev = get_direction(f, knots, m)
+        knot_direction = d[-k:]
+        d_norm = np.linalg.norm(d)
+
+        if d_norm < 1e-5:
             break
+
+        # Stop if ||d|| has not changed for 5 iterations
+        if previous_norm is not None and np.isclose(d_norm, previous_norm):
+            unchanged_count += 1
+        else:
+            unchanged_count = 0
+
+        if unchanged_count >= 5:
+            break
+
+        previous_norm = d_norm
 
         knots = armijo(f, S, knots, m, knot_direction)
 
         if track_iterates:
             iterates.append(knots[1:-1].copy())
 
-    _, S, approx, dev = get_direction(f, knots, m)
+    _, S, approx, final_dev = get_direction(f, knots, m)
     if track_iterates:
-        return knots, S, approx, iteration, iterates
+        return knots, S, approx, iteration, final_dev, iterates
 
-    return knots, S, approx, iteration
+    return knots, S, approx, iteration, final_dev
+
+
+# insert additional knots if Nurnberger's algorithm returns fewer than k internal knots
+def insert_extra_knots(knots, k, a, b):
+    knots = np.asarray(knots, dtype=float)
+
+    while len(knots) < k + 2:
+        # Find the largest gap between consecutive knots
+        gaps = np.diff(knots)
+        # Find the index of the largest gap
+        i = np.argmax(gaps)
+
+        # Insert a new knot in the middle of the largest gap
+        new_knot = 0.5 * (knots[i] + knots[i + 1])
+        knots = np.insert(knots, i + 1, new_knot)
+
+    return knots
 
 
 if __name__ == "__main__":
-    function_name = "sin3t"
+    function_name = "g"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
     a, b = test_functions.INTERVALS[function_name]
     k = 2
     m = 2
 
-    approx, x_min = nurnberger_mod.discontinuous_spline(
-        f, a, b, k, m
-    )  # TODO remove x_min, just get internal knots from approx.g.knots[1:-1]
-    theta_start = approx.g.knots[1:-1]
+    approx, _ = nurnberger_mod.discontinuous_spline(f, a, b, k, m)
+    theta_start = approx.g.knots
+    if len(theta_start) != k + 2:
+        theta_start = insert_extra_knots(theta_start, k, a, b)
+    theta_start = theta_start[1:-1]  # internal knots only
 
-    new_knots, S, A, iteration, iterates = descent_algo(
+    new_knots, S, A, iteration, iterates, z = descent_algo(
         theta_start, f, a, b, m, k, track_iterates=True
     )
 
-    plotting.plot_report(
-        A,
-        points=A.basis,
-        f_label=f_label,
-        approximation_label=rf"$S_{{{m}}}(t)$",
-        title=f"Descent algorithm for {f_label} with {k} internal knots and degree {m}",
-        file_name=f"z_{function_name}_k{k}_m{m}_test",
-    )
+    # plotting.plot_report(
+    #     A,
+    #     points=A.basis,
+    #     f_label=f_label,
+    #     approximation_label=rf"$S_{{{m}}}(t)$",
+    #     title=f"Descent algorithm for {f_label} with {k} internal knots and degree {m}",
+    #     file_name=f"z_{function_name}_k{k}_m{m}_test",
+    # )
+
+    # print(iterates)
 
     npz_path = Path(f"psi_surfaces/psi_surface_{function_name}_k{k}_m{m}.npz")
     if npz_path.exists():
@@ -234,14 +268,22 @@ if __name__ == "__main__":
         theta_1_values = data["theta_1_values"]
         theta_2_values = data["theta_2_values"]
         psi_values = data["psi_values"]
-    plotting.plot_objective_psi_contour(
+    function_label = test_functions.FUNCTION_LABELS[function_name]
+    plotting.plot_objective_psi_3d(
         theta_1_values,
         theta_2_values,
         psi_values,
-        theta_found=new_knots[1:-1],
-        theta_path=iterates,
-        file_name=f"z_psi_path_contour_{function_name}_k{k}_m{m}",
+        title=rf"Objective surface $\overline{{\Psi}}(\theta)$: {function_label}, $k={k}$, $m={m}$",
+        file_name=f"z_psi_{function_name}_k{k}_m{m}",
     )
+    # plotting.plot_objective_psi_contour(
+    #     theta_1_values,
+    #     theta_2_values,
+    #     psi_values,
+    #     theta_found=new_knots[1:-1],
+    #     theta_path=iterates,
+    #     file_name=f"z_psi_path_contour_{function_name}_k{k}_m{m}",
+    # )
     # knots = np.linspace(a, x_min, k + 1)
     # knots = np.concatenate([knots, [b]])
 

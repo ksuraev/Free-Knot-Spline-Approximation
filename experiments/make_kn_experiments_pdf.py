@@ -10,8 +10,8 @@ ROOT = SCRIPT_DIR.parent
 sys.path.insert(0, str(ROOT))
 
 PLOTS = ROOT / "plots" / "2026-09-23"
-K2_RESULTS = SCRIPT_DIR / "k2results.csv"
-OUTPUT = SCRIPT_DIR / "experiment_report_k2.pdf"
+KN_RESULTS = SCRIPT_DIR / "knresults.csv"
+OUTPUT = SCRIPT_DIR / "experiment_report_kn.pdf"
 
 PAGE = pymupdf.paper_rect("a4")
 PAGE_WIDTH = PAGE.height
@@ -73,27 +73,29 @@ def add_plots(page, plots, titles, rects):
 
 
 def add_results_text(page, record, rect):
-    fields = [
-        ("Initial max deviation", "initialmaxdeviation"),
-        ("Nürnberger start", "thetastart"),
-        ("Theta opt", "thetaopt"),
-        ("Final max deviation", "finalmaxdeviation"),
-        ("Iterations", "iterations"),
-    ]
+    text = (
+        f"Max deviation: "
+        f"equidistant = {format_value(record['equidistantmaxdeviation'])},   "
+        f"initial = {format_value(record['initialmaxdeviation'])},   "
+        f"final = {format_value(record['finalmaxdeviation'])}"
+    )
 
-    text = "\n".join(f"{label}: {format_value(record[key])}" for label, key in fields)
+    page.insert_textbox(
+        rect,
+        text,
+        fontsize=10,
+        align=pymupdf.TEXT_ALIGN_CENTER,
+    )
 
-    page.insert_textbox(rect, text, fontsize=10, lineheight=1.25)
 
-
-def new_page(document, function, m):
+def new_page(document, function, m, k):
     page = document.new_page(width=PAGE_WIDTH, height=PAGE_HEIGHT)
-    page.insert_text((20, 25), f"{function}   k=2   m={m}", fontsize=15)
+    page.insert_text((20, 25), f"{function}   k={k}   m={m}", fontsize=15)
 
     return page
 
 
-def add_k2_page(document, record):
+def add_k_page(document, record):
     function = str(record["function"]).strip()
     m = int(record["m"])
     k = int(record["k"])
@@ -101,46 +103,47 @@ def add_k2_page(document, record):
     prefix = f"{function}_k{k}_m{m}"
 
     plots = [
+        PLOTS / f"{prefix}_equidistant.pdf",
         PLOTS / f"{prefix}_initial.pdf",
-        PLOTS / f"psi_path_{prefix}.pdf",
-        PLOTS / f"psi_path_contour_{prefix}.pdf",
         PLOTS / f"{prefix}_final.pdf",
     ]
 
     titles = [
-        "Initial approximation (Nürnberger points)",
-        "Objective surface and descent path",
-        "Contour plot and descent path",
+        "Equidistant-knot approximation",
+        "Initial approximation",
         "Final approximation",
     ]
 
-    page = new_page(document, function, m)
+    page = new_page(document, function, m, k)
 
-    rects = grid_rects(rows=2, cols=2, top=40, bottom=105)
-
+    rects = grid_rects(rows=1, cols=3, top=40, bottom=20)
     add_plots(page, plots, titles, rects)
-
     add_results_text(
         page,
         record,
-        pymupdf.Rect(20, PAGE_HEIGHT - 100, PAGE_WIDTH - 20, PAGE_HEIGHT - 5),
+        pymupdf.Rect(
+            20,
+            PAGE_HEIGHT - 65,
+            PAGE_WIDTH - 20,
+            PAGE_HEIGHT - 10,
+        ),
     )
 
 
 def main():
     document = pymupdf.open()
 
-    results = pd.read_csv(K2_RESULTS)
-    results = results.sort_values(["function", "m"])
+    results = pd.read_csv(KN_RESULTS)
+    results = results[results["k"].between(3, 7) & results["m"].between(1, 3)]
+    results = results.sort_values(["function", "k", "m"])
 
     for _, record in results.iterrows():
-        add_k2_page(document, record)
+        add_k_page(document, record)
 
     if OUTPUT.exists():
         OUTPUT.unlink()
 
     document.save(OUTPUT, garbage=4, deflate=True)
-
     document.close()
 
     print(f"Created {OUTPUT}")
