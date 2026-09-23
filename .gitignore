@@ -13,3 +13,4 @@ report_plot.py
 prev_code/
 /test\ loops/
 experiments/*.pdf
+experiments/*.tex
