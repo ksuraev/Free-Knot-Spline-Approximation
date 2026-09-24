@@ -79,7 +79,7 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
             points=initial_basis,
             f_label=test_functions.FUNCTION_LABELS[function],
             approximation_label=rf"$s^{0}_{{{m}}}(t)$",
-            title=r"Initial approximation at $\theta^{\mathrm{mod}}$",
+            title=r"Initial approximation at $\theta_1^{\mathrm{mod}}$",
             file_name=f"{function}_k{k}_m{m}_initial",
         )
 
@@ -135,7 +135,7 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
             theta_found=theta_opt,
             psi_found=psi_opt,
             theta_path=theta_path,
-            title=r"Descent path on $\overline{\Psi}(\theta)$",
+            title=r"Descent path on $\overline{\Psi}(\theta_1)$",
             file_name=f"psi_opt_path_{function}_k{k}_m{m}",
         )
 
@@ -226,3 +226,5 @@ for i, row in df.iterrows():
 
 with open("experiments/k1results_rows.tex", "w") as f:
     f.write("\n".join(rows))
+
+df.to_csv("experiments/k1results.csv", index=False)
