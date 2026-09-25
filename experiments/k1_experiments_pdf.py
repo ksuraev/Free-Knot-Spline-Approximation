@@ -10,8 +10,6 @@ ROOT = SCRIPT_DIR.parent
 
 sys.path.insert(0, str(ROOT))
 
-import test_functions
-
 PLOTS = ROOT / "plots" / "2026-09-24"
 K1_RESULTS = SCRIPT_DIR / "k1results.csv"
 OUTPUT = SCRIPT_DIR / "experiment_report_k1.pdf"
