@@ -258,7 +258,7 @@ if __name__ == "__main__":
     )
 
     # Plot the spline approximation
-    plotting.plot_report(
+    plotting.plot_single(
         A,
         points=A.basis,
         f_label=function_label,
@@ -276,7 +276,7 @@ if __name__ == "__main__":
         psi_values = data["psi_values"]
 
     # Plot the contour of Psi bar with the descent path
-    plotting.plot_objective_psi_contour(
+    plotting.plot_objective_psi_bar_contour(
         theta_1_values,
         theta_2_values,
         psi_values,
