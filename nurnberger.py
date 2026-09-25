@@ -112,20 +112,20 @@ def run(f, a, b, k, m, max_iter=100, verbose=False):
 if __name__ == "__main__":
     function_name = "g"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
+    function_label = test_functions.FUNCTION_LABELS[function_name]
+    a, b = test_functions.INTERVALS[function_name]
 
-    a, b = -1, 1
-
-    # report examples
+    # Report examples
     pairs = [(1, 2), (2, 1), (2, 2), (6, 2)]
 
     for k, m in pairs:
         approx = run(f, a, b, k, m)
 
-        plotting.plot_report(
+        plotting.plot_single(
             approx,
             points=approx.basis,
-            f_label=r"$f_{1}(t)$",
-            approximation_label=rf"$S_{{{m}}}(t)$",
+            f_label=rf"{function_label}",
+            approximation_label=rf"$s_{{{m}}}(t)$",
             title=rf"$k={k},\ m={m}$",
-            file_name=f"nberger_f1_{function_name}_a{a}_b{b}_k{k}_m{m}",
+            file_name=f"nberger_{function_name}_k{k}_m{m}",
         )
