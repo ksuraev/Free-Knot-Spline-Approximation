@@ -73,7 +73,7 @@ def exchange(basis, t_new, d_max, errors):
     return basis
 
 
-def remez(f, a, b, m, max_iter=10000, verbose=False):
+def run(f, a, b, m, max_iter=10000, verbose=False):
     """Remez algorithm for polynomial approximation of degree m to function f on interval [a, b]."""
     # Guess initial m+2 points equidistantly spaced in the interval [a, b]
     basis = np.linspace(a, b, m + 2)
@@ -118,7 +118,7 @@ if __name__ == "__main__":
     a, b = test_functions.INTERVALS[function_name]
 
     for m in [2, 5, 12, 30]:
-        approx = remez(f, a, b, m)
+        approx = run(f, a, b, m)
 
         plotting.plot_single(
             approx,
