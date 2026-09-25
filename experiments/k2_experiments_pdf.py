@@ -9,7 +9,7 @@ ROOT = SCRIPT_DIR.parent
 
 sys.path.insert(0, str(ROOT))
 
-PLOTS = ROOT / "plots" / "2026-09-23"
+PLOTS = ROOT / "plots" / "2026-09-24"
 K2_RESULTS = SCRIPT_DIR / "k2results.csv"
 OUTPUT = SCRIPT_DIR / "experiment_report_k2.pdf"
 
