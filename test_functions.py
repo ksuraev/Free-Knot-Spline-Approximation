@@ -98,6 +98,7 @@ INTERVALS = {
     "f_g": (-1, 1),
 }
 
+# For report plotting use numbered f
 FUNCTION_LABELS = {
     name: rf"$f_{{{i}}}$" for i, name in enumerate(TEST_FUNCTIONS, start=1)
 }
