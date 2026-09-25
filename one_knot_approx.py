@@ -1,7 +1,6 @@
 import numpy as np
 
 import nadia_mod
-import nurnberger
 import nurnberger_mod
 import plotting
 import remez
@@ -28,6 +27,7 @@ def fixed_left_tail(f, a, theta, b, m):
     # Combine their bases
     basis = [left_approx.basis, right_approx.basis[0]]
 
+    # Create the final approximation object
     approx = Spline.Approximation(f, S, [a, b], basis=basis)
 
     _, _, d_left = left_approx.maxdeviation()
@@ -76,7 +76,7 @@ def fixed_right_tail(f, a, theta, b, m):
     }
 
 
-def psi(f, a, b, theta, m, n, verbose=False):
+def Psi_bar(f, a, b, theta, m, n, verbose=False):
     """Compute the maximum deviation of the best spline approximation with a knot at theta."""
     two_int_chain = nadia_mod.gra(f, [a, theta, b], m, n)
 
@@ -157,12 +157,14 @@ def psi(f, a, b, theta, m, n, verbose=False):
 
 def directional_derivative(f, a, b, theta, psi_theta, m, n, h):
     """Approximate the directional derivative of psi at theta in the direction of h using finite differences."""
-    psi_theta_h = psi(f, a, b, theta + h, m, n)["d_max"]
+    psi_theta_h = Psi_bar(f, a, b, theta + h, m, n)["d_max"]
 
     return (psi_theta_h - psi_theta) / abs(h)
 
 
-def armijo(f, a, b, theta, psi_theta, m, n, g, d, rho=0.5, c=0.1, verbose=False):
+def armijo_line_search(
+    f, a, b, theta, psi_theta, m, n, g, d, rho=0.5, c=0.1, verbose=False
+):
     """Armijo line search to find the next theta in the direction of d."""
     if d < 0:
         alpha = a - theta / d
@@ -179,7 +181,7 @@ def armijo(f, a, b, theta, psi_theta, m, n, g, d, rho=0.5, c=0.1, verbose=False)
             continue
 
         # Compute psi at the new theta
-        psi_next = psi(f, a, b, theta_next, m, n, verbose=verbose)["d_max"]
+        psi_next = Psi_bar(f, a, b, theta_next, m, n, verbose=verbose)["d_max"]
 
         if verbose:
             print(
@@ -196,7 +198,7 @@ def armijo(f, a, b, theta, psi_theta, m, n, g, d, rho=0.5, c=0.1, verbose=False)
     return theta
 
 
-def find_optimal_theta(
+def descent_algortihm(
     f,
     a,
     b,
@@ -210,13 +212,13 @@ def find_optimal_theta(
     max_iter=30,
     verbose=False,
 ):
-    """Find the optimal theta that minimises psi(theta) using directional derivatives and Armijo line search."""
+    """Find the optimal theta that minimises Psi_bar(theta) using directional derivatives and Armijo line search."""
     theta = theta_min
     iterates = [theta]
 
     for i in range(max_iter):
         # Compute the approximate directional derivatives at the current theta
-        psi_theta = psi(f, a, b, theta, m, n, verbose=verbose)["d_max"]
+        psi_theta = Psi_bar(f, a, b, theta, m, n, verbose=verbose)["d_max"]
         g_plus = directional_derivative(f, a, b, theta, psi_theta, m, n, h)
         g_minus = directional_derivative(f, a, b, theta, psi_theta, m, n, -h)
 
@@ -237,7 +239,7 @@ def find_optimal_theta(
             break
 
         # Use Armijo line search to find the next theta
-        theta_next = armijo(
+        theta_next = armijo_line_search(
             f, a, b, theta, psi_theta, m, n, g, d, rho, c, verbose=verbose
         )
         iterates.append(theta_next)
@@ -249,85 +251,60 @@ def find_optimal_theta(
         theta = theta_next
 
     else:
-        print(f"Maximum iterations ({i+1}) reached in find_optimal_theta()")
+        print(f"Maximum iterations ({i + 1}) reached in descent_algortihm()")
 
-    psi_theta = psi(f, a, b, theta, m, n, verbose=verbose)
+    psi_theta = Psi_bar(f, a, b, theta, m, n, verbose=verbose)
 
     if verbose:
         print(
-            f"Optimal theta found: {theta:.10f} with psi(theta)={psi_theta['d_max']:.10f}"
+            f"Optimal theta found: {theta:.10f} with Psi_bar(theta)={psi_theta['d_max']:.10f}"
         )
 
     return theta, psi_theta, i + 1, iterates
 
 
 if __name__ == "__main__":
-    function_name = "cos_weird"
+    # Example usage
+    function_name = "g"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
+    function_label = test_functions.FUNCTION_LABELS[function_name]
+    a, b = test_functions.INTERVALS[function_name]
 
-    # a, b = test_functions.INTERVALS[function_name]
-    a, b = 0, 12
     k = 1
     n = k + 1
     m = 1
 
+    # Get starting knots from Nurnberger's modified algorithm
     approx, theta_min = nurnberger_mod.discontinuous_spline(f, a, b, k, m)
 
+    # If theta_min is None, use the first internal knot from the approximation as the starting point
     if theta_min is None:
         theta_min = approx.g.knots[1]
 
     # Find optimal theta
-    # theta_opt, psi_result, iterations, theta_path = find_optimal_theta(
-    #     f, a, b, m, n, theta_min, verbose=True
-    # )
-
-    # def case(case_num):
-    #     if case_num == 1:
-    #         return "two intervals"
-    #     elif case_num == 2:
-    #         return "fixed left"
-    #     elif case_num == 3:
-    #         return "fixed right"
-
-    # status = (
-    #     f"optimal, {case(psi_result['case'])}"
-    #     if psi_result["optimal"]
-    #     else f"not optimal, {case(psi_result['case'])}"
-    # )
+    theta_opt, psi_result, iterations, theta_path = descent_algortihm(
+        f, a, b, m, n, theta_min, verbose=True
+    )
 
     # Load precomputed psi(theta) values from the .npz file
     data = np.load(f"psi_surfaces/psi_surface_{function_name}_k{k}_m{m}.npz")
     thetas = data["theta_values"]
     psi_values = data["psi_values"]
 
-    nurnberger_original = nurnberger.run(f, a, b, k, m).g.knots[1]
-
-    plotting.plot_objective_psi(
+    plotting.plot_objective_psi_bar(
         thetas,
         psi_values,
-        nurnbergers_orig_point=nurnberger_original,
-        nurnbergers_mod_point=theta_min,
-        # title=rf"Objective function $\overline{{\Psi}}(\theta_1)$",
-        file_name=f"z_psi_{function_name}_k{k}_m{m}_both_nurn_pts",
+        theta_found=theta_opt,
+        theta_path=theta_path,
+        psi_found=psi_result["d_max"],
+        title=r"Descent path on $\overline{{\Psi}}(\theta)$",
+        file_name=f"psi_opt_path_{function_name}_k{k}_m{m}",
     )
 
-    # plotting.plot_duo(
-    #     psi_result["approximation"],
-    #     points=psi_result["approximation"].basis,
-    #     f_label=f_label,
-    #     approximation_label=rf"$S_{{{m},{k}}}(t)$",
-    #     title=(
-    #         f"Degree-{m} spline approximation of {f_label}. "
-    #         f"{k} internal knots ({status}). "
-    #         f"Max abs deviation: {psi_result['d_max']:.5f}."
-    #     ),
-    #     file_name=f"z_oneknotapprox_duo_alg_{function_name}_k{k}_m{m}",
-    # )
-
-    # plotting.plot_report(
-    #     psi_result["approximation"],
-    #     points=psi_result["approximation"].basis,
-    #     f_label=f_label,
-    #     approximation_label=rf"$S_{{{m},{k}}}(t)$",
-    #     file_name=f"oneknotapprox_report_{function_name}_k{k}_m{m}",
-    # )
+    plotting.plot_single(
+        psi_result["approximation"],
+        points=psi_result["approximation"].basis,
+        f_label=function_label,
+        approximation_label=rf"$S_{{{m},{k}}}(t)$",
+        file_name=f"{function_name}_k{k}_m{m}",
+    )
