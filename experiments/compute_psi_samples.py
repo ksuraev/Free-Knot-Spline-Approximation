@@ -1,7 +1,15 @@
+import sys
+from pathlib import Path
+
 import numpy as np
 from tqdm import tqdm
 
-import extras
+SCRIPT_DIR = Path(__file__).resolve().parent
+ROOT = SCRIPT_DIR.parent
+
+sys.path.insert(0, str(ROOT))
+
+import multi_knot_approx
 import one_knot_approx
 import test_functions
 
@@ -35,7 +43,9 @@ def compute_psi_samples_2d(
             theta_2 = theta_2_values[j]
 
             knots = np.array([a, theta_1, theta_2, b])
-            _, psi_value = extras.solve_simplex(f, knots, m)
+            _, _, _, psi_value = multi_knot_approx.evaluate_and_get_direction(
+                f, knots, m
+            )
 
             if psi_value is not None:
                 psi_values[i, j] = psi_value
@@ -53,10 +63,9 @@ if __name__ == "__main__":
 
     for function, k, m in experiments:
         print(f"Computing {function}, k={k}, m={m}")
-        f, f_label = test_functions.TEST_FUNCTIONS[function]
+        f, _ = test_functions.TEST_FUNCTIONS[function]
         a, b = test_functions.INTERVALS[function]
         if k == 1:
-
             thetas, psi_values = compute_psi_samples_1d(
                 f, a, b, m, k + 1, a + 0.1, b - 0.1
             )
