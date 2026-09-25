@@ -617,7 +617,7 @@ def plot_objective_psi_bar_contour(
     theta_2_min = theta_2_grid.flat[min_index]
     psi_min = psi_values.flat[min_index]
 
-    fig, ax = plt.subplots(figsize=figsize, constrained_layout=True)
+    fig, ax = plt.subplots(figsize=figsize)
 
     # "zoom in" on the region
     # ax.set_xlim(-0.4, 0.4)
