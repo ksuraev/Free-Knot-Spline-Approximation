@@ -30,6 +30,7 @@ def step_zero(knots, m, n, fixed_left_tail=False, fixed_right_tail=False):
 
 
 def build_P(basis, knots, m):
+    """Build P for the linear system in step one."""
     return np.array(
         [
             [
@@ -205,7 +206,6 @@ def check_exit_1(
             chain_intervals = []
 
             for k in range(i, j + 1):
-
                 if k == i:
                     # First interval: [θ_i, θ_{i+1}]
                     points = [
@@ -265,7 +265,7 @@ def check_exit_1(
 
 
 # generalised Remez algorithm
-def gra(
+def run(
     f,
     knots,
     m,
@@ -349,24 +349,25 @@ if __name__ == "__main__":
     # evaluating psi section example
     function_name = "g"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
+    function_label = test_functions.FUNCTION_LABELS[function_name]
+    a, b = test_functions.INTERVALS[function_name]
 
-    a, b = -1, 1
     k = 3  # number of internal fixed knots
     m = 1  # degree of polynomial to fit in each subinterval
     n = k + 1  # number of subintervals
 
     knots = np.linspace(a, b, k + 2)
 
-    result = gra(f, knots, m, n, exchange_function=exchange, verbose=True)
+    result = run(f, knots, m, n, exchange_function=exchange, verbose=True)
 
     plotting.plot_duo(
         result["approximation"],
         points=result["approximation"].basis,
-        f_label=r"$f_{1}(t)$",
+        f_label=function_label,
         deviation_label=rf"$f_{1}(t)-s^r_{{{m}}}(t)$",
         approximation_label=rf"$s^r_{{{m}}}(t)$",
         approximation_title=rf"Current fixed-knot spline $s^r_{{{m}}}$",
         deviation_title=rf"Corresponding deviation $f_1-s^r_{{{m}}}$",
-        highlightknots=[-0.5],
-        file_name=f"z_duo_orig_f1_{function_name}_k{k}_m{m}",
+        highlight_knots=[-0.5],
+        file_name=f"duo_orig_gra_{function_name}_k{k}_m{m}",
     )
