@@ -9,6 +9,7 @@ DEVIATION_TOL = 1e-6
 
 
 def calculate_polynomial(f, basis, m):
+    """Calculate the polynomial approximation of degree m to function f using the given basis points."""
     # Initialise matrix A and vector b
     A = np.zeros((m + 2, m + 2))
     b = np.zeros(m + 2)
@@ -40,39 +41,40 @@ def calculate_polynomial(f, basis, m):
     return P, E
 
 
-def exchange(basis, x_new, d_max, errors):
+def exchange(basis, t_new, d_max, errors):
+    """VP basis exchange algorithm to update the basis points with a new point t_new."""
     # If the new point is outside the leftmost point
-    if x_new < basis[0]:
+    if t_new < basis[0]:
         if np.sign(d_max) == np.sign(errors[0]):
             # replace the leftmost point
-            basis[0] = x_new
+            basis[0] = t_new
         else:
-            # add x_new to the left and drop rightmost point
-            basis = np.insert(basis, 0, x_new)[:-1]
+            # add t_new to the left and drop rightmost point
+            basis = np.insert(basis, 0, t_new)[:-1]
 
     # If the new point is outside the rightmost point
-    elif x_new > basis[-1]:
+    elif t_new > basis[-1]:
         if np.sign(d_max) == np.sign(errors[-1]):
             # replace the rightmost point
-            basis[-1] = x_new
+            basis[-1] = t_new
         else:
-            # add x_new to the right and drop leftmost point
-            basis = np.append(basis[1:], x_new)
+            # add t_new to the right and drop leftmost point
+            basis = np.append(basis[1:], t_new)
 
     # If the new point is between two existing points
     else:
         for i in range(len(basis) - 1):
-            if basis[i] < x_new < basis[i + 1]:
-
+            if basis[i] < t_new < basis[i + 1]:
                 # Replace with the closest point with same sign
                 if np.sign(d_max) == np.sign(errors[i]):
-                    basis[i] = x_new
+                    basis[i] = t_new
                 else:
-                    basis[i + 1] = x_new
+                    basis[i + 1] = t_new
     return basis
 
 
 def remez(f, a, b, m, max_iter=10000, verbose=False):
+    """Remez algorithm for polynomial approximation of degree m to function f on interval [a, b]."""
     # Guess initial m+2 points equidistantly spaced in the interval [a, b]
     basis = np.linspace(a, b, m + 2)
 
@@ -81,7 +83,7 @@ def remez(f, a, b, m, max_iter=10000, verbose=False):
         approx = Spline.Approximation(f, P, [a, b], basis)
 
         # Find maximum absolute deviation over [a, b]
-        _, x_max, d_max = approx.maxdeviation()
+        _, t_max, d_max = approx.maxdeviation()
 
         # Check for convergence - Trefethen paper
         if abs(E) < CONVERGENCE_TOL:
@@ -90,13 +92,13 @@ def remez(f, a, b, m, max_iter=10000, verbose=False):
             converged = abs(d_max) - abs(E) <= DEVIATION_TOL * abs(E)
         if converged:
             if verbose:
-                print(f"Final max abs deviation: {abs(d_max):.5f} at t*={x_max:.5f}")
+                print(f"Final max abs deviation: {abs(d_max):.5f} at t*={t_max:.5f}")
                 print(f"Final basis: {approx.basis}")
             return approx
 
         # Update the basis points using VP exchange
         basis_dev = f(basis) - P(basis)
-        basis = exchange(basis, x_max, d_max, basis_dev)
+        basis = exchange(basis, t_max, d_max, basis_dev)
 
     approx = Spline.Approximation(f, P, [a, b], basis)
 
@@ -109,21 +111,20 @@ def remez(f, a, b, m, max_iter=10000, verbose=False):
 
 
 if __name__ == "__main__":
+    # Example usage matching report examples
     function_name = "g"
-    f, f_label = test_functions.TEST_FUNCTIONS[function_name]
-
-    a, b = -1, 1
-    # m = 30
+    f, _ = test_functions.TEST_FUNCTIONS[function_name]
+    function_label = test_functions.FUNCTION_LABELS[function_name]
+    a, b = test_functions.INTERVALS[function_name]
 
     for m in [2, 5, 12, 30]:
-
         approx = remez(f, a, b, m)
 
-        plotting.plot_report(
+        plotting.plot_single(
             approx,
             points=approx.basis,
-            f_label=r"$f_{1}(t)$",
+            f_label=rf"{function_label}",
             approximation_label=rf"$P_{{{m}}}(t)$",
             title=rf"$m={m}$",
-            file_name=f"remez_f1_{function_name}_m{m}",
+            file_name=f"remez_{function_name}_m{m}",
         )
