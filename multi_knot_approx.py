@@ -1,12 +1,12 @@
 import warnings
 from pathlib import Path
 
+import GRA
 import numpy as np
 import pulp as pl
 import qpsolvers
 from qpsolvers.conversions.ensure_sparse_matrices import SparseConversionWarning
 
-import nadia_original
 import nurnberger_mod
 import plotting
 import Spline
@@ -17,7 +17,7 @@ warnings.filterwarnings("ignore", category=SparseConversionWarning)
 
 def subgradients(basis, S, signs):
     """Compute the subgradients"""
-    P = nadia_original.build_P(basis, S.knots, S.degree)
+    P = GRA.build_P(basis, S.knots, S.degree)
     P = P.T
 
     M = np.zeros((len(S.knots) - 2, P.shape[1]))
@@ -56,7 +56,7 @@ def descent_direction(basis, S, signs):
 
 
 def simplex_system(f, samples, knots, m):
-    P = nadia_original.build_P(samples, knots, m)
+    P = GRA.build_P(samples, knots, m)
     M = np.concatenate([np.ones((len(samples), 1)), P], axis=1)
 
     # Stack M and -M vertically

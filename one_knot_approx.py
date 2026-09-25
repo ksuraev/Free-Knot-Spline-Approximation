@@ -1,6 +1,6 @@
 import numpy as np
 
-import nadia_mod
+import GRA_mod
 import nurnberger_mod
 import plotting
 import remez
@@ -11,10 +11,10 @@ import test_functions
 def fixed_left_tail(f, a, theta, b, m):
     """Compute the best spline approximation with a fixed left tail at theta."""
     # Best polynomial approximation on [a, theta]
-    left_approx = remez.remez(f, a, theta, m)
+    left_approx = remez.run(f, a, theta, m)
 
     # GRA on [theta, b], fixed to the left polynomial value at theta
-    right_result = nadia_mod.gra(
+    right_result = GRA_mod.run(
         f, [theta, b], m, 1, fixed_left_value=left_approx.g(theta)
     )
 
@@ -45,10 +45,10 @@ def fixed_left_tail(f, a, theta, b, m):
 def fixed_right_tail(f, a, theta, b, m):
     """Compute the best spline approximation with a fixed right tail at theta."""
     # Best polynomial approximation on [theta, b]
-    right_approx = remez.remez(f, theta, b, m)
+    right_approx = remez.run(f, theta, b, m)
 
     # GRA on [a, theta], fixed to the right polynomial value at theta
-    left_result = nadia_mod.gra(
+    left_result = GRA_mod.run(
         f, [a, theta], m, 1, fixed_right_value=right_approx.g(theta)
     )
 
@@ -78,7 +78,7 @@ def fixed_right_tail(f, a, theta, b, m):
 
 def Psi_bar(f, a, b, theta, m, n, verbose=False):
     """Compute the maximum deviation of the best spline approximation with a knot at theta."""
-    two_int_chain = nadia_mod.gra(f, [a, theta, b], m, n)
+    two_int_chain = GRA_mod.run(f, [a, theta, b], m, n)
 
     # Case 1: found optimal spline across two intervals
     if two_int_chain["exit_type"] == 1:
