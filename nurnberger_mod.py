@@ -81,7 +81,7 @@ def discontinuous_spline(f, a, b, k, m, max_iter=100, verbose=False):
             new_knots.append(x_min)
 
             # spline interval is [x_i, x_min].
-            approx_i = remez.remez(f, x_i, x_min, m, verbose=verbose)
+            approx_i = remez.run(f, x_i, x_min, m, verbose=verbose)
             new_approximations.append(approx_i)
 
             x_i = x_min
@@ -102,7 +102,7 @@ def discontinuous_spline(f, a, b, k, m, max_iter=100, verbose=False):
     # Handle convergence before the first iteration
     if approximations is None:
         approximations = [
-            remez.remez(f, knots[i], knots[i + 1], m) for i in range(len(knots) - 1)
+            remez.run(f, knots[i], knots[i + 1], m) for i in range(len(knots) - 1)
         ]
 
     # Create the final spline and approximation

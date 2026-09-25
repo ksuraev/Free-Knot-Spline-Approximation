@@ -11,7 +11,7 @@ TOL = 1e-5
 
 def d(f, a, b, m):
     """Return the maximum absolute deviation and Remez approximation on [a, b]."""
-    approx = remez.remez(f, a, b, m)
+    approx = remez.run(f, a, b, m)
     _, _, d_max = approx.maxdeviation()
 
     return abs(d_max), approx
@@ -92,7 +92,7 @@ def run(f, a, b, k, m, max_iter=100, verbose=False):
     # If convergence happened before any new approximations were built
     if approximations is None:
         approximations = [
-            remez.remez(f, knots[i], knots[i + 1], m) for i in range(len(knots) - 1)
+            remez.run(f, knots[i], knots[i + 1], m) for i in range(len(knots) - 1)
         ]
 
     # Create the final spline and approximation
