@@ -17,7 +17,7 @@ sys.path.insert(0, str(ROOT))
 
 import compute_psi_samples
 
-import extras
+import multi_knot_approx
 import nurnberger
 import nurnberger_mod
 import plotting
@@ -35,34 +35,44 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
     for function, k, m in progress:
         progress.set_postfix(function=function, k=k, m=m)
 
-        f, f_label = test_functions.TEST_FUNCTIONS[function]
+        f, _ = test_functions.TEST_FUNCTIONS[function]
+        function_label = test_functions.FUNCTION_LABELS[function]
         a, b = test_functions.INTERVALS[function]
 
         # Compute initial spline approximation based on equidistant knots
         equidistant_knots = np.linspace(a, b, k + 2)
-        equidistant_z, equidistant_approx, _ = extras.solve_simplex(
-            f, equidistant_knots, m
+        _, _, equidistant_approx, equidistant_z = (
+            multi_knot_approx.evaluate_and_get_direction(f, equidistant_knots, m)
         )
+
         # Plot the equidistant spline approximation
-        plotting.plot_report(
+        plotting.plot_single(
             equidistant_approx,
             points=equidistant_approx.basis,
-            f_label=test_functions.FUNCTION_LABELS[function],
+            f_label=function_label,
             approximation_label=rf"$s^{{\mathrm{{eq}}}}_{{{m}}}(t)$",
             title="Equidistant-knot approximation",
             file_name=f"{function}_k{k}_m{m}_equidistant",
         )
-        # Compute initial approximation using Nurnberger's modified algorithm as starting point for the descent algorithm
+
+        # Compute initial approximation at Nurnberger's modified points
         modified_approx, _ = nurnberger_mod.discontinuous_spline(f, a, b, k, m)
         initial_knots = modified_approx.g.knots
+
+        # If the number of internal knots is not equal to k, insert extra knots
         if len(initial_knots) != k + 2:
-            initial_knots = extras.insert_extra_knots(initial_knots, k, a, b)
-        initial_z, initial_approx, _ = extras.solve_simplex(f, initial_knots, m)
+            initial_knots = multi_knot_approx.insert_extra_knots(initial_knots, k)
+
+        # Compute the initial approximation and its maximum deviation
+        _, _, initial_approx, initial_z = multi_knot_approx.evaluate_and_get_direction(
+            f, initial_knots, m
+        )
+
         # Plot the initial spline approximation
-        plotting.plot_report(
+        plotting.plot_single(
             initial_approx,
             points=initial_approx.basis,
-            f_label=test_functions.FUNCTION_LABELS[function],
+            f_label=function_label,
             approximation_label=rf"$s^{0}_{{{m}}}(t)$",
             title=r"Initial approximation at $\theta^{\mathrm{mod}}$",
             file_name=f"{function}_k{k}_m{m}_initial",
@@ -89,8 +99,8 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
                 psi_values=psi_values,
             )
 
-        # # plot psi(theta) as 3d surface
-        # plotting.plot_objective_psi_3d(
+        # # plot Psi bar(theta) as 3d surface
+        # plotting.plot_objective_psi_bar_3d(
         #     theta_1_values,
         #     theta_2_values,
         #     psi_values,
@@ -98,8 +108,8 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
         #     file_name=f"psi_{function}_k{k}_m{m}",
         # )
 
-        # # plot psi(theta) as contour plot
-        # plotting.plot_objective_psi_contour(
+        # # plot Psi bar(theta) as contour plot
+        # plotting.plot_objective_psi_bar_contour(
         #     theta_1_values,
         #     theta_2_values,
         #     psi_values,
@@ -107,10 +117,10 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
         #     file_name=f"psi_contour_{function}_k{k}_m{m}",
         # )
 
-        # Plot psi(theta) as contour plot with Nurnberger's original and modified points
+        # Plot Psi bar(theta) as contour plot with Nurnberger's original and modified points
         nurnberger_original = nurnberger.run(f, a, b, k, m).g.knots[1:-1]
 
-        plotting.plot_objective_psi_contour(
+        plotting.plot_objective_psi_bar_contour(
             theta_1_values,
             theta_2_values,
             psi_values,
@@ -121,12 +131,14 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
         )
 
         # Find optimal knots
-        opt_knots, S, final_approx, iterations, final_z, iterates = extras.descent_algo(
-            initial_knots[1:-1], f, a, b, m, k, track_iterates=True
+        opt_knots, S, final_approx, iterations, final_z, iterates = (
+            multi_knot_approx.descent_algorithm(
+                initial_knots[1:-1], f, a, b, m, k, track_iterates=True
+            )
         )
 
-        # Plot psi(theta) again, this time highlighting the optimal theta found by the algorithm and the path taken by the algorithm
-        plotting.plot_objective_psi_3d(
+        # Plot Psi bar(theta) again, this time highlighting the optimal theta found by the algorithm and the path taken by the algorithm
+        plotting.plot_objective_psi_bar_3d(
             theta_1_values,
             theta_2_values,
             psi_values,
@@ -136,7 +148,7 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
             file_name=f"psi_path_{function}_k{k}_m{m}",
         )
 
-        plotting.plot_objective_psi_contour(
+        plotting.plot_objective_psi_bar_contour(
             theta_1_values,
             theta_2_values,
             psi_values,
@@ -147,10 +159,10 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
         )
 
         # Plot the final spline approximation
-        plotting.plot_report(
+        plotting.plot_single(
             final_approx,
             points=final_approx.basis,
-            f_label=test_functions.FUNCTION_LABELS[function],
+            f_label=function_label,
             approximation_label=rf"$s^*_{{{m}}}(t)$",
             title="Final approximation",
             file_name=f"{function}_k{k}_m{m}_final",
@@ -177,7 +189,7 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
         )
 
 df = pd.DataFrame(results)
-df.to_csv("experiments/knresults.csv", index=False)
+df.to_csv("experiments/k2results.csv", index=False)
 
 function_order = list(test_functions.TEST_FUNCTIONS.keys())
 

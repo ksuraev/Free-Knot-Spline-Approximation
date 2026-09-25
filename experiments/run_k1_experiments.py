@@ -31,12 +31,15 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
     for function, k, m in progress:
         progress.set_postfix(function=function, k=k, m=m)
 
-        f, f_label = test_functions.TEST_FUNCTIONS[function]
+        f, _ = test_functions.TEST_FUNCTIONS[function]
+        function_label = test_functions.FUNCTION_LABELS[function]
         a, b = test_functions.INTERVALS[function]
 
         # Compute initial spline approximation based on equidistant knots
         equidistant_theta = (a + b) / 2
-        equidistant_result = one_knot_approx.psi(f, a, b, equidistant_theta, m, k + 1)
+        equidistant_result = one_knot_approx.Psi_bar(
+            f, a, b, equidistant_theta, m, k + 1
+        )
         equidistant_approx = equidistant_result["approximation"]
         equidistant_max_deviation = abs(equidistant_approx.maxdeviation()[2])
         equidistant_d_max = equidistant_result["d_max"]
@@ -46,10 +49,10 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
         equidistant_case = equidistant_result["case"]
 
         # Plot the equidistant spline approximation
-        plotting.plot_report(
+        plotting.plot_single(
             equidistant_approx,
             points=equidistant_basis,
-            f_label=test_functions.FUNCTION_LABELS[function],
+            f_label=function_label,
             approximation_label=rf"$s^{{\mathrm{{eq}}}}_{{{m}}}(t)$",
             title="Equidistant-knot approximation",
             file_name=f"{function}_k{k}_m{m}_equidistant",
@@ -62,7 +65,7 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
         if initial_theta is None:
             initial_theta = initial_approx.g.knots[1]
 
-        initial_result = one_knot_approx.psi(f, a, b, initial_theta, m, k + 1)
+        initial_result = one_knot_approx.Psi_bar(f, a, b, initial_theta, m, k + 1)
         initial_approx = initial_result["approximation"]
         initial_max_deviation = abs(initial_approx.maxdeviation()[2])
         initial_d_max = initial_result["d_max"]
@@ -74,16 +77,16 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
         initial_case = initial_result["case"]
 
         # plot initial spline approximation
-        plotting.plot_report(
+        plotting.plot_single(
             initial_approx,
             points=initial_basis,
-            f_label=test_functions.FUNCTION_LABELS[function],
+            f_label=function_label,
             approximation_label=rf"$s^{0}_{{{m}}}(t)$",
             title=r"Initial approximation at $\theta_1^{\mathrm{mod}}$",
             file_name=f"{function}_k{k}_m{m}_initial",
         )
 
-        # Use precomputed psi(theta) values from the .npz file to get thetas and psi_values
+        # Use precomputed Psi_bar(theta) values from the .npz file to get thetas and psi_values
         npz_path = Path(f"psi_surfaces/psi_surface_{function}_k{k}_m{m}.npz")
         if npz_path.exists():
             data = np.load(npz_path)
@@ -96,13 +99,13 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
             )
             np.savez(npz_path, theta_values=thetas, psi_values=psi_values)
 
-        # plot psi(theta)
-        theta_sample_min, psi_sample_min = plotting.plot_objective_psi(
+        # plot Psi_bar(theta)
+        theta_sample_min, psi_sample_min = plotting.plot_objective_psi_bar(
             thetas, psi_values, file_name=f"psi_{function}_k{k}_m{m}"
         )
 
         # Find optimal theta
-        theta_opt, result, iterations, theta_path = one_knot_approx.find_optimal_theta(
+        theta_opt, result, iterations, theta_path = one_knot_approx.descent_algortihm(
             f, a, b, m, k + 1, initial_theta
         )
         psi_opt = result["d_max"]
@@ -110,7 +113,7 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
         nurnberger_original = nurnberger.run(f, a, b, k, m).g.knots[1]
         nurnberger_modified = initial_theta
 
-        plotting.plot_objective_psi(
+        plotting.plot_objective_psi_bar(
             thetas,
             psi_values,
             nurnbergers_orig_point=nurnberger_original,
@@ -119,8 +122,8 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
             file_name=f"psi_{function}_k{k}_m{m}_nurnberger_points",
         )
 
-        # Plot psi(theta) again, this time highlighting the optimal theta found by the algorithm
-        # plotting.plot_objective_psi(
+        # Plot Psi_bar(theta) again, this time highlighting the optimal theta found by the algorithm
+        # plotting.plot_objective_psi_bar(
         #     thetas,
         #     psi_values,
         #     theta_found=theta_opt,
@@ -128,8 +131,8 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
         #     file_name=f"psi_opt_{function}_k{k}_m{m}",
         # )
 
-        # Plot psi(theta) again, this time highlighting the optimal theta found by the algorithm and the path taken by the algorithm
-        plotting.plot_objective_psi(
+        # Plot Psi_bar(theta) again, this time highlighting the optimal theta found by the algorithm and the path taken by the algorithm
+        plotting.plot_objective_psi_bar(
             thetas,
             psi_values,
             theta_found=theta_opt,
@@ -150,10 +153,10 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
         final_case = result["case"]
 
         # Plot the final spline approximation
-        plotting.plot_report(
+        plotting.plot_single(
             result["approximation"],
             points=final_basis,
-            f_label=test_functions.FUNCTION_LABELS[function],
+            f_label=function_label,
             approximation_label=rf"$s^*_{{{m}}}(t)$",
             title="Final approximation",
             file_name=f"{function}_k{k}_m{m}_final",
@@ -192,11 +195,7 @@ df = pd.DataFrame(results)
 
 function_order = list(test_functions.TEST_FUNCTIONS.keys())
 
-function_labels = {
-    name: rf"$f_{{{i}}}$" for i, name in enumerate(function_order, start=1)
-}
-
-df["function_label"] = df["function"].map(function_labels)
+df["function_label"] = df["function"].map(test_functions.FUNCTION_LABELS)
 
 df["function"] = pd.Categorical(
     df["function"],

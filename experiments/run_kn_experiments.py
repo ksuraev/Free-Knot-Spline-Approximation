@@ -15,7 +15,7 @@ if results_path.exists():
 
 sys.path.insert(0, str(ROOT))
 
-import extras
+import multi_knot_approx
 import nurnberger_mod
 import plotting
 import test_functions
@@ -23,7 +23,7 @@ import test_functions
 experiments = [
     (function, k, m)
     for function in test_functions.TEST_FUNCTIONS
-    for k in range(3, 5)
+    for k in range(3, 8)
     for m in range(1, 4)
 ]
 results = []
@@ -32,19 +32,20 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
     for function, k, m in progress:
         progress.set_postfix(function=function, k=k, m=m)
 
-        f, f_label = test_functions.TEST_FUNCTIONS[function]
+        f, _ = test_functions.TEST_FUNCTIONS[function]
+        function_label = test_functions.FUNCTION_LABELS[function]
         a, b = test_functions.INTERVALS[function]
 
         # Compute initial spline approximation based on equidistant knots
         equidistant_knots = np.linspace(a, b, k + 2)
-        equidistant_z, equidistant_approx, _ = extras.solve_simplex(
-            f, equidistant_knots, m
+        _, _, equidistant_approx, equidistant_z = (
+            multi_knot_approx.evaluate_and_get_direction(f, equidistant_knots, m)
         )
         # Plot the initial spline approximation
-        plotting.plot_report(
+        plotting.plot_single(
             equidistant_approx,
             points=equidistant_approx.basis,
-            f_label=test_functions.FUNCTION_LABELS[function],
+            f_label=function_label,
             approximation_label=rf"$s^{{\mathrm{{eq}}}}_{{{m}}}(t)$",
             title="Equidistant-knot approximation",
             file_name=f"{function}_k{k}_m{m}_equidistant",
@@ -53,27 +54,31 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
         modified_approx, _ = nurnberger_mod.discontinuous_spline(f, a, b, k, m)
         initial_knots = modified_approx.g.knots
         if len(initial_knots) != k + 2:
-            initial_knots = extras.insert_extra_knots(initial_knots, k, a, b)
-        initial_z, initial_approx, _ = extras.solve_simplex(f, initial_knots, m)
-        plotting.plot_report(
+            initial_knots = multi_knot_approx.insert_extra_knots(initial_knots, k, a, b)
+        _, _, initial_approx, initial_z = multi_knot_approx.evaluate_and_get_direction(
+            f, initial_knots, m
+        )
+        plotting.plot_single(
             initial_approx,
             points=initial_approx.basis,
-            f_label=test_functions.FUNCTION_LABELS[function],
+            f_label=function_label,
             approximation_label=rf"$s^{0}_{{{m}}}(t)$",
             title=r"Initial approximation at $\theta^{\mathrm{mod}}$",
             file_name=f"{function}_k{k}_m{m}_initial",
         )
 
         # Find optimal knots
-        opt_knots, S, final_approx, iterations, final_z, iterates = extras.descent_algo(
-            initial_knots[1:-1], f, a, b, m, k, track_iterates=True
+        opt_knots, S, final_approx, iterations, final_z, iterates = (
+            multi_knot_approx.descent_algorithm(
+                initial_knots[1:-1], f, a, b, m, k, track_iterates=True
+            )
         )
 
         # Plot the final spline approximation
-        plotting.plot_report(
+        plotting.plot_single(
             final_approx,
             points=final_approx.basis,
-            f_label=test_functions.FUNCTION_LABELS[function],
+            f_label=function_label,
             approximation_label=rf"$s^*_{{{m}}}(t)$",
             title="Final approximation",
             file_name=f"{function}_k{k}_m{m}_final",
