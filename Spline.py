@@ -109,6 +109,20 @@ class Spline:
             for k, theta in enumerate(self.knots[1:-1])
         )
 
+    def is_differentiable_at(self, j, tol=1e-6):
+        """Check if the spline is differentiable at the specified internal knot."""
+        assert 1 <= j <= len(self.knots) - 2, "knot index j must be an internal knot"
+
+        knot = self.knots[j]
+        p_right = self.polynomials[j - 1]
+        p_left = self.polynomials[j]
+
+        # check continuity
+        if not np.isclose(p_left(knot), p_right(knot), atol=tol, rtol=0):
+            return False
+
+        return np.isclose(p_left.deriv()(knot), p_right.deriv()(knot), atol=tol, rtol=0)
+
     def concatenate(this, S):
         """Concatenate two splines"""
 
@@ -179,6 +193,19 @@ class SUSpline(Spline):
 
         return sum(p(t) for p in self.polynomials if t >= p.offset)
 
+    def is_differentiable_at(self, j, tol=1e-6):
+        assert 1 <= j <= len(self.knots) - 2, "knot index j must be an internal knot"
+
+        p = self.polynomials[j]
+
+        a_j0 = p.coef[0]
+        a_j1 = p.coef[1] if len(p.coef) > 1 else 0.0
+
+        continuous = np.isclose(a_j0, 0.0, atol=tol, rtol=0)
+        derivative_continuous = np.isclose(a_j1, 0.0, atol=tol, rtol=0)
+
+        return continuous and derivative_continuous
+
 
 class Approximation:
     """An approximation of f by g."""
@@ -193,7 +220,7 @@ class Approximation:
         """Return the signed deviation f(t) - g(t)."""
         return self.f(t) - self.g(t)
 
-    def _extrema(self, n_samples=10000):
+    def _extrema(self, n_samples=5000):
         """Return local maxima of absolute deviation as (i, t, d)."""
         knots = self.g.knots if hasattr(self.g, "knots") else self.interval
         extrema = []
@@ -201,8 +228,8 @@ class Approximation:
         for i in range(len(knots) - 1):
             t = np.linspace(knots[i], knots[i + 1], n_samples)
 
-            if i > 0:
-                t = t[1:]
+            if i < len(knots) - 2:
+                t = t[:-1]
 
             d = self.deviation(t)
             abs_d = np.abs(d)
@@ -225,13 +252,13 @@ class Approximation:
 
         return extrema
 
-    def maxdeviation(self, n_samples=10000):
+    def maxdeviation(self, n_samples=5000):
         """Return the maximum deviation"""
         extrema = self._extrema(n_samples)
         d_max = max(extrema, key=lambda x: abs(x[2]))
         return d_max
 
-    def maxdeviationpoints(self, tol=1e-5, n_samples=10000):
+    def maxdeviationpoints(self, tol=1e-4, n_samples=5000):
         """Return all points attaining the maximum absolute deviation."""
         extrema = self._extrema(n_samples)
 
@@ -240,19 +267,45 @@ class Approximation:
 
         global_max = max(abs(d) for _, _, d in extrema)
 
-        return [(t, d) for _, t, d in extrema if abs(abs(d) - global_max) <= tol]
+        return [
+            (t, d)
+            for _, t, d in extrema
+            if np.isclose(abs(d), global_max, atol=tol, rtol=1e-2)
+        ]
 
-    def alternancesequence(self, tol=1e-4, n_samples=10000):
+    def alternancesequence(self, tol=1e-4, n_samples=5000):
         """Return largest sequence of alternance points, with their signs."""
         points = self.maxdeviationpoints(tol=tol, n_samples=n_samples)
 
         unique = []
 
         for t, d in points:
-            if not unique or not np.isclose(t, unique[-1][0]):
+            if not unique or not np.isclose(t, unique[-1][0], rtol=1e-2, atol=tol):
                 unique.append((t, d))
 
         pts = np.array([t for t, _ in unique])
         signs = np.array([np.sign(d) for _, d in unique])
 
         return pts, signs
+
+    def alternance_per_interval(self, alt_pts):
+        """Return the number of alternance points in each interval."""
+
+        counts = []
+        knots = self.g.knots
+        n_intervals = len(knots) - 1
+
+        for i in range(n_intervals):
+            left = knots[i]
+            right = knots[i + 1]
+
+            if i == n_intervals - 1:
+                # Last interval -  [left, right]
+                count = np.sum((alt_pts >= left) & (alt_pts <= right))
+            else:
+                # Other intervals - [left, right)
+                count = np.sum((alt_pts >= left) & (alt_pts < right))
+
+            counts.append(int(count))
+
+        return counts
