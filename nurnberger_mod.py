@@ -236,7 +236,7 @@ def get_knots_reverse(f, a, b, k, m, max_iter=100, verbose=False):
 
 
 def discontinuous_spline(f, a, b, k, m, max_iter=100, verbose=False):
-    """Construct the modified Nurnberger free-knot spline approximation"""
+    """Construct the modified Nurnberger free-knot discontinuous spline approximation using x_min left knots."""
     knots, d_min, d_max = nurnberger.step_zero(f, a, b, k, m)
 
     x_min_knots = []
