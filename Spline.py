@@ -220,7 +220,7 @@ class Approximation:
         """Return the signed deviation f(t) - g(t)."""
         return self.f(t) - self.g(t)
 
-    def _extrema(self, n_samples=5000):
+    def _extrema(self, n_samples=1000):
         """Return local maxima of absolute deviation as (i, t, d)."""
         knots = self.g.knots if hasattr(self.g, "knots") else self.interval
         extrema = []
@@ -252,13 +252,13 @@ class Approximation:
 
         return extrema
 
-    def maxdeviation(self, n_samples=5000):
+    def maxdeviation(self, n_samples=1000):
         """Return the maximum deviation"""
         extrema = self._extrema(n_samples)
         d_max = max(extrema, key=lambda x: abs(x[2]))
         return d_max
 
-    def maxdeviationpoints(self, tol=1e-4, n_samples=5000):
+    def maxdeviationpoints(self, tol=1e-4, n_samples=1000):
         """Return all points attaining the maximum absolute deviation."""
         extrema = self._extrema(n_samples)
 
@@ -273,7 +273,7 @@ class Approximation:
             if np.isclose(abs(d), global_max, atol=tol, rtol=1e-2)
         ]
 
-    def alternancesequence(self, tol=1e-4, n_samples=5000):
+    def alternancesequence(self, tol=1e-4, n_samples=1000):
         """Return largest sequence of alternance points, with their signs."""
         points = self.maxdeviationpoints(tol=tol, n_samples=n_samples)
 
