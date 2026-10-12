@@ -101,6 +101,7 @@ def Psi_bar(f, knots, m):
 
     # The active constraints should give us the maximum deviation points:
     active = [int(name) for name, c in list(prob.constraints.items()) if c.slack == 0]
+    print(active)
     t_active = np.array(
         [
             [samples[i], -1] if i < nsamples else [samples[i - nsamples], 1]
@@ -163,10 +164,24 @@ def Psi_bar_dual(f, knots, m):
 
     alt_pts = np.concatenate([i_plus, i_minus])
     alt_pts = alt_pts[np.argsort(alt_pts[:, 0])]
+    basis = alt_pts[:, 0]  # [t for [t, _] in t_active]
+    signs = alt_pts[:, 1]  # [s for [_, s] in t_active]
 
-    v = [(samples[i], s) for (i, s) in alt_pts]
+    # Get the dual variable values
+    # Extract the solution for the coefficients and the deviation
+    r = [-c.pi for c in pb.constraints()]
+    a = np.concatenate([r[1:].reshape(len(knots) - 1, m)])
+    coeffs = [np.concatenate([[0], c]) for c in a]
+    coeffs[0][0] = r[0]
 
-    print(v)
+    # for c in prob.constraints.items():
+    #     print(c[1].value(), c[1].pi)
+
+    # Create the spline from the coefficients and knots
+    polynomials = [Spline.Polynomial(c, offset=x) for c, x in zip(coeffs, knots[:-1])]
+    S = Spline.SUSpline(knots, polynomials)
+    A = Spline.Approximation(f, S, [knots[0], knots[-1]], basis=basis)
+
     obj = pl.value(prob.objective)
 
     # print(alt_pts)
@@ -174,7 +189,7 @@ def Psi_bar_dual(f, knots, m):
     # for c in prob.constraints.items():
     #     print(c[1].pi)
     # print(f"Dual objective: {obj}")
-    return obj, alt_pts
+    return obj, A, signs
 
 
 def armijo_line_search(f, knots, m, d, rho=0.5, c=0.1):
@@ -304,7 +319,8 @@ if __name__ == "__main__":
 
     z, A, signs = Psi_bar(f, np.concatenate([[a], theta_start, [b]]), m)
 
-    obj, alt_pts = Psi_bar_dual(f, np.concatenate([[a], theta_start, [b]]), m)
+    zd, Ad, signsd = Psi_bar_dual(f, np.concatenate([[a], theta_start, [b]]), m)
+    # obj, alt_pts = Psi_bar_dual(f, np.concatenate([[a], theta_start, [b]]), m)
 
     # # Run the descent algorithm to find the optimal internal knots
     # optimal_knots, S, A, iteration, deviation, iterates = descent_algorithm(
