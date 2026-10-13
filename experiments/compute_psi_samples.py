@@ -14,23 +14,39 @@ import one_knot_approx
 import test_functions
 
 
-def compute_psi_samples_1d(f, a, b, m, n, theta_start, theta_end, step=0.05):
+def compute_psi_samples_1d(f, a, b, m, n, theta_start, theta_end, nsamples, step=0.05):
     """Compute Psi(theta) for a range of theta values between theta_start and theta_end."""
-    thetas = np.arange(theta_start, theta_end, step)
+    if nsamples is None:
+        thetas = np.arange(theta_start, theta_end, step)
+    else:
+        thetas = np.linspace(theta_start, theta_end, nsamples)
 
     psi_values = np.array(
-        [one_knot_approx.psi(f, a, b, theta, m, n)["d_max"] for theta in thetas]
+        [one_knot_approx.Psi_bar(f, a, b, theta, m, n)["d_max"] for theta in thetas]
     )
 
     return thetas, psi_values
 
 
 def compute_psi_samples_2d(
-    f, a, b, m, theta_1_start, theta_1_end, theta_2_start, theta_2_end, step=0.05
+    f,
+    a,
+    b,
+    m,
+    theta_1_start,
+    theta_1_end,
+    theta_2_start,
+    theta_2_end,
+    nsamples,
+    step=0.05,
 ):
     """Compute Psi(theta_1, theta_2) for a range of theta_1 and theta_2 values."""
-    theta_1_values = np.arange(theta_1_start, theta_1_end, step)
-    theta_2_values = np.arange(theta_2_start, theta_2_end, step)
+    if nsamples is not None:
+        theta_1_values = np.linspace(theta_1_start, theta_1_end, nsamples)
+        theta_2_values = np.linspace(theta_2_start, theta_2_end, nsamples)
+    else:
+        theta_1_values = np.arange(theta_1_start, theta_1_end, step)
+        theta_2_values = np.arange(theta_2_start, theta_2_end, step)
 
     # Initialise a 2D array to store psi values
     psi_values = np.full((len(theta_1_values), len(theta_2_values)), np.nan)
@@ -44,7 +60,7 @@ def compute_psi_samples_2d(
 
             knots = np.array([a, theta_1, theta_2, b])
             _, _, _, psi_value = multi_knot_approx.evaluate_and_get_direction(
-                f, knots, m
+                f, knots, m, nsamples=nsamples
             )
 
             if psi_value is not None:
