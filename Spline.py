@@ -177,6 +177,23 @@ class Spline:
 class SUSpline(Spline):
     """A spline whose formula is as in Sukhorukova & Ugon, 2017"""
 
+    @classmethod
+    def from_coefficients(cls, knots, m, coefs):
+        """Construct a SUSpline from a flat coefficient vector."""
+
+        a0 = coefs[0]
+        a = coefs[1:].reshape(len(knots) - 1, m)
+
+        polynomial_coefs = [np.concatenate([[0], c]) for c in a]
+
+        polynomial_coefs[0][0] = a0
+
+        polynomials = [
+            Polynomial(c, offset=knot) for c, knot in zip(polynomial_coefs, knots[:-1])
+        ]
+
+        return cls(knots, polynomials)
+
     def __call__(self, t):
         """Evaluate the spline at point `t`."""
 
@@ -204,7 +221,7 @@ class SUSpline(Spline):
         continuous = np.isclose(a_j0, 0.0, atol=tol, rtol=0)
         derivative_continuous = np.isclose(a_j1, 0.0, atol=tol, rtol=0)
 
-        return continuous and derivative_continuous
+        return bool(continuous and derivative_continuous)
 
 
 class Approximation:
