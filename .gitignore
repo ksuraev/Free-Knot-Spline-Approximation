@@ -15,4 +15,5 @@ prev_code/
 experiments/*.pdf
 experiments/*.tex
 psi_surfaces_10000_k1/
+psi_surfaces_1000/
 Julia/
