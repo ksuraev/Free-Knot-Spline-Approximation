@@ -68,15 +68,11 @@ def simplex_system(f, samples, knots, m):
     return A, b
 
 
-def Psi_bar(f, knots, m):
+def Psi_bar(f, knots, m, nsamples):
     """Evaluate Psi bar at the given knots and return the approximation and signs of the deviation."""
-    nsamples = 1000
+    # nsamples = 1000
     samples = np.linspace(knots[0], knots[-1], nsamples)
     A, b = simplex_system(f, samples, knots, m)
-
-    # Objective function: minimise the last variable (the deviation)
-    # c = np.zeros(A.shape[1])
-    # c[-1] = 1
 
     prob = pl.LpProblem("simplex", pl.LpMinimize)
 
@@ -99,6 +95,10 @@ def Psi_bar(f, knots, m):
     solver = pl.HiGHS(msg=False)
     prob.solve(solver)
 
+    status = pl.LpStatus[prob.status]
+    if status != "Optimal":
+        return None, None, None
+
     # The active constraints should give us the maximum deviation points:
     active = [int(name) for name, c in list(prob.constraints.items()) if c.slack == 0]
     print(active)
@@ -111,29 +111,19 @@ def Psi_bar(f, knots, m):
 
     # Sort the active points by their t values and extract the basis and signs
     t_active = t_active[np.argsort(t_active[:, 0])]
-    print(t_active)
     basis = t_active[:, 0]  # [t for [t, _] in t_active]
     signs = t_active[:, 1]  # [s for [_, s] in t_active]
 
-    # Extract the solution for the coefficients and the deviation
-    r = np.array([x[j].varValue for j in range(A.shape[1])])
-    a = np.concatenate([r[1:].reshape(len(knots) - 1, m)])
-    coeffs = [np.concatenate([[0], c]) for c in a]
-    coeffs[0][0] = r[0]
-
-    # for c in prob.constraints.items():
-    #     print(c[1].value(), c[1].pi)
-
-    # Create the spline from the coefficients and knots
-    polynomials = [Spline.Polynomial(c, offset=x) for c, x in zip(coeffs, knots[:-1])]
-    S = Spline.SUSpline(knots, polynomials)
+    # Extract the coefficients from the solution and construct the spline approximation
+    coefs = np.array([x[j].varValue for j in range(A.shape[1])])
+    S = Spline.SUSpline.from_coefficients(knots, m, coefs)
     A = Spline.Approximation(f, S, [knots[0], knots[-1]], basis=basis)
 
     return z.varValue, A, signs
 
 
-def Psi_bar_dual(f, knots, m):
-    nsamples = 1000
+def Psi_bar_dual(f, knots, m, nsamples):
+    # nsamples = 1000
     samples = np.linspace(knots[0], knots[-1], nsamples)
     A, b = simplex_system(f, samples, knots, m)
 
@@ -164,41 +154,21 @@ def Psi_bar_dual(f, knots, m):
 
     alt_pts = np.concatenate([i_plus, i_minus])
     alt_pts = alt_pts[np.argsort(alt_pts[:, 0])]
-    basis = alt_pts[:, 0]  # [t for [t, _] in t_active]
-    signs = alt_pts[:, 1]  # [s for [_, s] in t_active]
 
-    # Get the dual variable values
-    # Extract the solution for the coefficients and the deviation
-    r = [-c.pi for c in pb.constraints()]
-    a = np.concatenate([r[1:].reshape(len(knots) - 1, m)])
-    coeffs = [np.concatenate([[0], c]) for c in a]
-    coeffs[0][0] = r[0]
-
-    # for c in prob.constraints.items():
-    #     print(c[1].value(), c[1].pi)
-
-    # Create the spline from the coefficients and knots
-    polynomials = [Spline.Polynomial(c, offset=x) for c, x in zip(coeffs, knots[:-1])]
-    S = Spline.SUSpline(knots, polynomials)
-    A = Spline.Approximation(f, S, [knots[0], knots[-1]], basis=basis)
+    v = [(samples[i], s) for (i, s) in alt_pts]
 
     obj = pl.value(prob.objective)
 
-    # print(alt_pts)
-
-    # for c in prob.constraints.items():
-    #     print(c[1].pi)
-    # print(f"Dual objective: {obj}")
-    return obj, A, signs
+    return obj, alt_pts
 
 
-def armijo_line_search(f, knots, m, d, rho=0.5, c=0.1):
+def armijo_line_search(f, knots, m, d, nsamples, rho=0.5, c=0.1):
     """Armijo line search to find the next theta in the direction of d."""
     # Initialise the step size
     alpha = 100.0
     d_full = np.concatenate([[0], d, [0]])
     curr_knots = knots.copy()
-    psi_theta, _, _ = Psi_bar(f, curr_knots, m)
+    psi_theta, _, _ = Psi_bar(f, curr_knots, m, nsamples=nsamples)
 
     while alpha > 1e-8:
         # Compute the next knots using the step size alpha
@@ -209,7 +179,7 @@ def armijo_line_search(f, knots, m, d, rho=0.5, c=0.1):
             alpha *= rho
             continue
 
-        psi_next, _, _ = Psi_bar(f, next_knots, m)
+        psi_next, _, _ = Psi_bar(f, next_knots, m, nsamples=nsamples)
 
         # Check the Armijo condition
         if psi_next <= psi_theta + c * alpha * (np.linalg.norm(d) ** 2):
@@ -221,10 +191,10 @@ def armijo_line_search(f, knots, m, d, rho=0.5, c=0.1):
     return curr_knots
 
 
-def evaluate_and_get_direction(f, knots, m):
+def evaluate_and_get_direction(f, knots, m, nsamples):
     """Evaluate Psi bar at the given knots and return the descent direction, spline, approximation, and deviation."""
     # Evaluate Psi bar at the given knots
-    deviation, approx, signs = Psi_bar(f, knots, m)
+    deviation, approx, signs = Psi_bar(f, knots, m, nsamples=nsamples)
 
     # Compute the descent direction using the subgradients and the simplex system
     S = approx.g
@@ -234,7 +204,7 @@ def evaluate_and_get_direction(f, knots, m):
     return d, S, approx, deviation
 
 
-def descent_algorithm(theta_start, f, a, b, m, k, track_iterates=False):
+def descent_algorithm(theta_start, f, a, b, m, k, nsamples=1000, track_iterates=False):
     """Descent algorithm to find the optimal internal knots for continuous spline approximation."""
     knots = np.concatenate([[a], theta_start, [b]])
 
@@ -246,7 +216,7 @@ def descent_algorithm(theta_start, f, a, b, m, k, track_iterates=False):
     unchanged_count = 0
 
     for iteration in range(100):
-        d, S, _, _ = evaluate_and_get_direction(f, knots, m)
+        d, S, _, _ = evaluate_and_get_direction(f, knots, m, nsamples=nsamples)
         knot_direction = d[-k:]
 
         d_norm = np.linalg.norm(d)
@@ -265,13 +235,13 @@ def descent_algorithm(theta_start, f, a, b, m, k, track_iterates=False):
         previous_d_norm = d_norm
 
         # Use Armijo line search to find the next knots in the direction of d
-        knots = armijo_line_search(f, knots, m, knot_direction)
+        knots = armijo_line_search(f, knots, m, knot_direction, nsamples=nsamples)
 
         if track_iterates:
             iterates.append(knots[1:-1].copy())
 
     # Final evaluation of Psi bar at the last knots
-    final_dev, approx, _ = Psi_bar(f, knots, m)
+    final_dev, approx, _ = Psi_bar(f, knots, m, nsamples=nsamples)
 
     if track_iterates:
         return knots, S, approx, iteration, final_dev, iterates
@@ -304,18 +274,15 @@ if __name__ == "__main__":
     function_label = test_functions.FUNCTION_LABELS[function_name]
 
     a, b = test_functions.INTERVALS[function_name]
-    k = 3
+    k = 2
     m = 2
 
     x_min_knots, x_max_knots = nurnberger_mod.get_knots(f, a, b, k, m)
     theta_start = x_min_knots
 
     # If the number of internal knots is not equal to k, insert extra knots
-    if len(theta_start) != k + 2:
+    if len(theta_start) != k:
         theta_start = insert_extra_knots(theta_start, k)
-
-    # Remove the first and last knots (the endpoints) to get the internal knots
-    theta_start = theta_start[1:-1]
 
     z, A, signs = Psi_bar(f, np.concatenate([[a], theta_start, [b]]), m)
 
@@ -323,18 +290,12 @@ if __name__ == "__main__":
     # obj, alt_pts = Psi_bar_dual(f, np.concatenate([[a], theta_start, [b]]), m)
 
     # # Run the descent algorithm to find the optimal internal knots
-    # optimal_knots, S, A, iteration, deviation, iterates = descent_algorithm(
-    #     theta_start, f, a, b, m, k, track_iterates=True
-    # )
+    optimal_knots, S, A, iteration, deviation, iterates = descent_algorithm(
+        theta_start, f, a, b, m, k, track_iterates=True
+    )
 
-    # alt_pts, _ = A.alternancesequence()
-    # print(f"Alternance points: {alt_pts}")
-    # print(f"deviation: {A.deviation(alt_pts[0])}")
-
-    # # print deviation at basis points
-    # basis = A.basis
-    # for t in basis:
-    #     print(f"Deviation at {t}: {A.deviation(t)}")
+    print(f"Optimal internal knots: {optimal_knots[1:-1]}")
+    print(f"basis/alt pts: {A.basis}")
 
     # # Plot the spline approximation
     # plotting.plot_single(
@@ -347,7 +308,9 @@ if __name__ == "__main__":
     # )
 
     # # Load the precomputed Psi bar values for contour plotting
-    # npz_path = Path(f"psi_surfaces/psi_surface_{function_name}_k{k}_m{m}.npz")
+    # npz_path = Path(
+    #     f"psi_surfaces_10000_simplex/psi_surface_{function_name}_k{k}_m{m}_10000.npz"
+    # )
     # if npz_path.exists():
     #     data = np.load(npz_path)
     #     theta_1_values = data["theta_1_values"]
