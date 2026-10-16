@@ -31,7 +31,9 @@ experiments = [
 ]
 
 
-def _plot_initial_knots_approx(f, function, function_label, k, m, knots, knot_type=""):
+def _plot_initial_knots_approx(
+    f, function, function_label, k, m, knots, nsamples, knot_type=""
+):
     if len(knots) != k:
         knots = [a, *knots, b]
         print(
@@ -42,7 +44,9 @@ def _plot_initial_knots_approx(f, function, function_label, k, m, knots, knot_ty
         knots = [a, *knots, b]
 
     # Compute the initial approximation and its maximum deviation
-    _, _, approx, z = multi_knot_approx.evaluate_and_get_direction(f, knots, m)
+    _, _, approx, z = multi_knot_approx.evaluate_and_get_direction(
+        f, knots, m, nsamples=nsamples
+    )
 
     # Plot the initial spline approximation
     # plotting.plot_single(
@@ -65,6 +69,7 @@ def _plot_final_knots_approx(
     k,
     m,
     knots,
+    nsamples,
     knot_type="",
 ):
     if len(knots) != k:
@@ -76,7 +81,7 @@ def _plot_final_knots_approx(
         knots = knots[1:-1]
 
     opt_knots, S, approx, iterations, final_z = multi_knot_approx.descent_algorithm(
-        knots, f, a, b, m, k, track_iterates=False
+        knots, f, a, b, m, k, nsamples=nsamples, track_iterates=False
     )
 
     # Plot the final spline approximation
@@ -91,24 +96,39 @@ def _plot_final_knots_approx(
     return opt_knots, S, approx, iterations, final_z
 
 
-ALTERNANCE_TOL = 1e-4
-DERIVATIVE_TOL = 1e-6
+def analyse_alternance(nsamples, approx, S, opt_knots):
+    alt_pts = approx.basis
+    counts = []
+    n_intervals = len(opt_knots) - 1
 
+    for i in range(n_intervals):
+        left = opt_knots[i]
+        right = opt_knots[i + 1]
 
-def analyse_alternance(approx, S, opt_knots):
-    alt_pts, _ = approx.alternancesequence()
-    interval_counts = approx.alternance_per_interval(alt_pts)
+        if i == n_intervals - 1:
+            # Last interval -  [left, right]
+            count = np.sum((alt_pts >= left) & (alt_pts <= right))
+        else:
+            # Other intervals - [left, right)
+            count = np.sum((alt_pts >= left) & (alt_pts < right))
+
+        counts.append(int(count))
 
     knot_is_alt_pt = []
     differentiable = []
 
     for j, knot in enumerate(opt_knots[1:-1], start=1):
-        knot_is_alt_pt.append(bool(np.any(np.isclose(alt_pts, knot))))
+        samples = np.linspace(a, b, nsamples)
+        closest_sample = samples[np.argmin(np.abs(samples - knot))]
+        knot_is_alt_pt.append(
+            bool(np.any(np.isclose(alt_pts, closest_sample, atol=1e-12, rtol=0)))
+        )
 
         differentiable.append(S.is_differentiable_at(j))
 
     return {
-        "alt_per_interval": interval_counts,
+        "alt_pts": alt_pts,
+        "alt_per_interval": counts,
         "knot_is_alt_pt": knot_is_alt_pt,
         "differentiable": differentiable,
     }
@@ -137,7 +157,7 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
         }
 
         initial_results = {}
-
+        nsamples = 1000
         for knot_type, knots in knot_sets.items():
             _, z = _plot_initial_knots_approx(
                 f,
@@ -146,6 +166,7 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
                 k,
                 m,
                 knots,
+                nsamples,
                 knot_type=knot_type,
             )
 
@@ -163,11 +184,12 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
                 k,
                 m,
                 knots,
+                nsamples,
                 knot_type=knot_type,
             )
 
             # Get alternance points for the final approximation
-            alternance = analyse_alternance(approx, S, opt_knots)
+            alternance = analyse_alternance(nsamples, approx, S, opt_knots)
 
             final_results[knot_type] = {
                 "knots": opt_knots,
@@ -205,6 +227,10 @@ with tqdm(experiments, desc="Experiments", unit="case") as progress:
 
             result[f"{knot_type}_differentiable"] = final_results[knot_type][
                 "differentiable"
+            ]
+
+            result[f"{knot_type}_alt_pts"] = [
+                round(float(x), 2) for x in final_results[knot_type]["alt_pts"]
             ]
 
         for knot_type in KNOT_TYPES:

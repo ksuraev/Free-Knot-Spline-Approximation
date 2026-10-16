@@ -19,7 +19,7 @@ def subgradients(basis, S, signs):
     """Compute the subgradients"""
     P = GRA.build_P(basis, S.knots, S.degree)
     P = P.T
-
+    print(len(S.knots))
     M = np.zeros((len(S.knots) - 2, P.shape[1]))
     a = [p.coef[1:] for p in S.polynomials]
     for i, knot in enumerate(S.knots[1:-1]):
@@ -51,7 +51,6 @@ def descent_direction(basis, S, signs):
 
     x = solution.x
     v = G @ x
-
     return -v
 
 
@@ -116,6 +115,7 @@ def Psi_bar(f, knots, m, nsamples):
 
     # Extract the coefficients from the solution and construct the spline approximation
     coefs = np.array([x[j].varValue for j in range(A.shape[1])])
+    print(f"Coefficients: {coefs}")
     S = Spline.SUSpline.from_coefficients(knots, m, coefs)
     A = Spline.Approximation(f, S, [knots[0], knots[-1]], basis=basis)
 
@@ -218,8 +218,20 @@ def descent_algorithm(theta_start, f, a, b, m, k, nsamples=1000, track_iterates=
     for iteration in range(100):
         d, S, _, _ = evaluate_and_get_direction(f, knots, m, nsamples=nsamples)
         knot_direction = d[-k:]
+        print(f"knot direction: {knot_direction}")
 
-        d_norm = np.linalg.norm(d)
+        # eps = 1e-3
+        # knots_plus = knots.copy()
+        # knots_minus = knots.copy()
+        # knots_plus[1:-1] += eps * knot_direction
+        # knots_minus[1:-1] -= eps * knot_direction
+        # z_plus, _, _ = Psi_bar(f, knots_plus, m, nsamples=nsamples)
+        # z_minus, _, _ = Psi_bar(f, knots_minus, m, nsamples=nsamples)
+        # if z_minus < z_plus:
+        #     knot_direction = -knot_direction
+
+        d_norm = np.linalg.norm(knot_direction)
+        print(f"Iteration {iteration}: ||d|| = {d_norm:.6f}")
         if d_norm < 1e-5:
             break
 
@@ -241,7 +253,8 @@ def descent_algorithm(theta_start, f, a, b, m, k, nsamples=1000, track_iterates=
             iterates.append(knots[1:-1].copy())
 
     # Final evaluation of Psi bar at the last knots
-    final_dev, approx, _ = Psi_bar(f, knots, m, nsamples=nsamples)
+    final_dev, approx, signs = Psi_bar(f, knots, m, nsamples=nsamples)
+    print(f"signs: {signs}")
 
     if track_iterates:
         return knots, S, approx, iteration, final_dev, iterates
@@ -269,13 +282,13 @@ def insert_extra_knots(knots, k):
 
 if __name__ == "__main__":
     # Example usage of the descent algorithm with a test function
-    function_name = "g"
+    function_name = "sin_if_else"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
     function_label = test_functions.FUNCTION_LABELS[function_name]
 
     a, b = test_functions.INTERVALS[function_name]
-    k = 2
-    m = 2
+    k = 1
+    m = 3
 
     x_min_knots, x_max_knots = nurnberger_mod.get_knots(f, a, b, k, m)
     theta_start = x_min_knots
@@ -284,9 +297,8 @@ if __name__ == "__main__":
     if len(theta_start) != k:
         theta_start = insert_extra_knots(theta_start, k)
 
-    z, A, signs = Psi_bar(f, np.concatenate([[a], theta_start, [b]]), m)
+    # z, A, signs = Psi_bar(f, np.concatenate([[a], theta_start, [b]]), m)
 
-    zd, Ad, signsd = Psi_bar_dual(f, np.concatenate([[a], theta_start, [b]]), m)
     # obj, alt_pts = Psi_bar_dual(f, np.concatenate([[a], theta_start, [b]]), m)
 
     # # Run the descent algorithm to find the optimal internal knots
@@ -294,18 +306,38 @@ if __name__ == "__main__":
         theta_start, f, a, b, m, k, track_iterates=True
     )
 
+    # npz_path = (
+    #     f"psi_surfaces_10000_simplex/psi_surface_{function_name}_k{k}_m{m}_10000.npz"
+    # )
+
+    # data = np.load(npz_path)
+
+    # thetas = data["theta_values"]
+    # psi_values = data["psi_values"]
+
+    # plotting.plot_objective_psi_bar(
+    #     thetas,
+    #     psi_values,
+    #     theta_found=optimal_knots[1],
+    #     psi_found=deviation,
+    #     theta_path=iterates,
+    #     title="Psi bar with descent path",
+    #     file_name=f"psi_path_{function_name}_k{k}_m{m}_test",
+    # )
+
     print(f"Optimal internal knots: {optimal_knots[1:-1]}")
+    print(f"Optimal Psi bar value: {deviation}")
     print(f"basis/alt pts: {A.basis}")
 
     # # Plot the spline approximation
-    # plotting.plot_single(
-    #     A,
-    #     points=A.basis,
-    #     f_label=function_label,
-    #     approximation_label=rf"$s^*_{{{m}}}(t)$",
-    #     title=f"Descent algorithm for {function_label} with {k} internal knots and degree {m}",
-    #     file_name=f"{function_name}_k{k}_m{m}_test",
-    # )
+    plotting.plot_single(
+        A,
+        points=A.basis,
+        f_label=function_label,
+        approximation_label=rf"$s^*_{{{m}}}(t)$",
+        title=f"Descent algorithm for {function_label} with {k} internal knots and degree {m}",
+        file_name=f"{function_name}_k{k}_m{m}_test",
+    )
 
     # # Load the precomputed Psi bar values for contour plotting
     # npz_path = Path(

@@ -9,7 +9,7 @@ ROOT = SCRIPT_DIR.parent
 
 sys.path.insert(0, str(ROOT))
 
-PLOTS = ROOT / "plots" / "2026-10-07"
+PLOTS = ROOT / "plots" / "2026-10-12"
 RESULTS = SCRIPT_DIR / "results.csv"
 OUTPUT = SCRIPT_DIR / "experiment_report_xmin_xmax.pdf"
 
@@ -75,8 +75,8 @@ def add_results_text(page, record, rect):
 
     groups = [
         ("x_min", left_lines),
-        ("x_max", left_lines),
-        ("x_min_rev", right_lines),
+        ("x_max", right_lines),
+        ("x_min_rev", left_lines),
         ("x_max_rev", right_lines),
     ]
 
