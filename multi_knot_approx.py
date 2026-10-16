@@ -154,12 +154,23 @@ def Psi_bar_dual(f, knots, m, nsamples):
 
     alt_pts = np.concatenate([i_plus, i_minus])
     alt_pts = alt_pts[np.argsort(alt_pts[:, 0])]
+    basis = alt_pts[:, 0]  # [t for [t, _] in t_active]
+    signs = alt_pts[:, 1]  # [s for [_, s] in t_active]
 
-    v = [(samples[i], s) for (i, s) in alt_pts]
+    # Extract the solution for the coefficients and the deviation
+    r = [-c.pi for c in prob.constraints()]
+    a = np.concatenate([r[1:].reshape(len(knots) - 1, m)])
+    coeffs = [np.concatenate([[0], c]) for c in a]
+    coeffs[0][0] = r[0]
+
+    # Create the spline from the coefficients and knots
+    polynomials = [Spline.Polynomial(c, offset=x) for c, x in zip(coeffs, knots[:-1])]
+    S = Spline.SUSpline(knots, polynomials)
+    A = Spline.Approximation(f, S, [knots[0], knots[-1]], basis=basis)
 
     obj = pl.value(prob.objective)
 
-    return obj, alt_pts
+    return obj, A, signs
 
 
 def armijo_line_search(f, knots, m, d, nsamples, rho=0.5, c=0.1):
@@ -299,31 +310,12 @@ if __name__ == "__main__":
 
     # z, A, signs = Psi_bar(f, np.concatenate([[a], theta_start, [b]]), m)
 
-    # obj, alt_pts = Psi_bar_dual(f, np.concatenate([[a], theta_start, [b]]), m)
+    zd, Ad, signsd = Psi_bar_dual(f, np.concatenate([[a], theta_start, [b]]), m)
 
     # # Run the descent algorithm to find the optimal internal knots
     optimal_knots, S, A, iteration, deviation, iterates = descent_algorithm(
         theta_start, f, a, b, m, k, track_iterates=True
     )
-
-    # npz_path = (
-    #     f"psi_surfaces_10000_simplex/psi_surface_{function_name}_k{k}_m{m}_10000.npz"
-    # )
-
-    # data = np.load(npz_path)
-
-    # thetas = data["theta_values"]
-    # psi_values = data["psi_values"]
-
-    # plotting.plot_objective_psi_bar(
-    #     thetas,
-    #     psi_values,
-    #     theta_found=optimal_knots[1],
-    #     psi_found=deviation,
-    #     theta_path=iterates,
-    #     title="Psi bar with descent path",
-    #     file_name=f"psi_path_{function_name}_k{k}_m{m}_test",
-    # )
 
     print(f"Optimal internal knots: {optimal_knots[1:-1]}")
     print(f"Optimal Psi bar value: {deviation}")
@@ -336,26 +328,5 @@ if __name__ == "__main__":
         f_label=function_label,
         approximation_label=rf"$s^*_{{{m}}}(t)$",
         title=f"Descent algorithm for {function_label} with {k} internal knots and degree {m}",
-        file_name=f"{function_name}_k{k}_m{m}_test",
+        file_name=f"{function_name}_k{k}_m{m}",
     )
-
-    # # Load the precomputed Psi bar values for contour plotting
-    # npz_path = Path(
-    #     f"psi_surfaces_10000_simplex/psi_surface_{function_name}_k{k}_m{m}_10000.npz"
-    # )
-    # if npz_path.exists():
-    #     data = np.load(npz_path)
-    #     theta_1_values = data["theta_1_values"]
-    #     theta_2_values = data["theta_2_values"]
-    #     psi_values = data["psi_values"]
-
-    # # Plot the contour of Psi bar with the descent path
-    # plotting.plot_objective_psi_bar_contour(
-    #     theta_1_values,
-    #     theta_2_values,
-    #     psi_values,
-    #     theta_found=optimal_knots[1:-1],
-    #     theta_path=iterates,
-    #     title=r"Descent path on $\overline{\Psi}(\theta)$",
-    #     file_name=f"psi_path_contour_{function_name}_k{k}_m{m}_test",
-    # )
