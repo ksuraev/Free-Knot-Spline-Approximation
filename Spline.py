@@ -305,23 +305,25 @@ class Approximation:
 
         return pts, signs
 
-    def alternance_per_interval(self, alt_pts):
-        """Return the number of alternance points in each interval."""
+    def alternance_per_interval(self, alt_pts, signs):
+        """Return the number of alternance points in each closed interval."""
+        alt_pts = np.asarray(alt_pts)
+        signs = np.asarray(signs)
 
         counts = []
         knots = self.g.knots
-        n_intervals = len(knots) - 1
 
-        for i in range(n_intervals):
+        for i in range(len(knots) - 1):
             left = knots[i]
             right = knots[i + 1]
 
-            if i == n_intervals - 1:
-                # Last interval -  [left, right]
-                count = np.sum((alt_pts >= left) & (alt_pts <= right))
+            mask = (alt_pts >= left) & (alt_pts <= right)
+            interval_signs = signs[mask]
+
+            if len(interval_signs) == 0:
+                count = 0
             else:
-                # Other intervals - [left, right)
-                count = np.sum((alt_pts >= left) & (alt_pts < right))
+                count = np.sum(interval_signs[1:] != interval_signs[:-1]) + 1
 
             counts.append(int(count))
 
