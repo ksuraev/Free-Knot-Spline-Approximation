@@ -1,3 +1,7 @@
+"""
+- Changed deviation to g(t) - f(t) in Approximation.deviation() to match the definition in the paper which may break other things
+"""
+
 import numpy as np
 from scipy.special import factorial
 
@@ -235,7 +239,7 @@ class Approximation:
 
     def deviation(self, t):
         """Return the signed deviation f(t) - g(t)."""
-        return self.f(t) - self.g(t)
+        return self.g(t) - self.f(t)
 
     def _extrema(self, n_samples=1000):
         """Return local maxima of absolute deviation as (i, t, d)."""

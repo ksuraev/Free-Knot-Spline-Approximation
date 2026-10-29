@@ -15,11 +15,93 @@ import test_functions
 warnings.filterwarnings("ignore", category=SparseConversionWarning)
 
 
+# β_j (𝜃,a,t)= sign * ∇_{θ,a} P_j(t)
+def beta(S, j, t, sign):
+    m = S.degree
+
+    wrt_coeffs = [
+        np.maximum(0, t - knot) ** d for knot in S.knots[:-1] for d in range(1, m + 1)
+    ]
+
+    wrt_knots = [-p.deriv()(t) for p in S.polynomials[1 : j + 1]]
+    wrt_knots = np.concatenate((wrt_knots, np.zeros(S.nintervals() - j - 1)))
+
+    return sign * np.concatenate(([1], wrt_coeffs, wrt_knots))
+
+
+# Δ_j = co{β_j, β_j+1}
+def Delta(S, j, t, sign):
+    return [beta(S, j - 1, t, sign), beta(S, j, t, sign)]
+
+
+def C(U, D=None):
+    if len(U) == 0:
+        return [0]  # single element? or array of zeros?
+    if D is not None and U[0] == D:
+        return C(U[1:], D)
+    return np.concatenate([[x + y for y in C(U[1:], D)] for x in U[0]])
+
+
+def is_unstable_point(a1, sign):
+    return (a1 < 0 and sign > 0) or (a1 > 0 and sign < 0)
+
+
+# S = {β_j : t ∈ E_smooth ∪ E_neutral ∪ E^+_max ∪ E^-_min}
+def build_stable_set_S(basis, S, signs):
+    betas = []
+
+    for t, sign in zip(basis, signs):
+        k = np.where(S.knots[:-1] <= t)[0][
+            -1
+        ]  # from Spline.py. t close to internal knot wont return the right k?
+
+        if 0 < k < S.nintervals() and np.isclose(t, S.knots[k]):
+            a1 = S.polynomials[k].coef[1]
+
+            if is_unstable_point(a1, sign):
+                continue
+            betas.append(beta(S, k - 1, t, sign))
+
+        betas.append(beta(S, k, t, sign))
+
+    return betas
+
+
+# U ={Δ_j : t ∈ E^+_min ∪ E^-_max}
+def build_unstable_set_U(basis, S, signs):
+    deltas = []
+
+    for t, sign in zip(basis, signs):
+        k = np.where(S.knots[:-1] <= t)[0][-1]
+
+        if not 0 < k < S.nintervals() or not np.isclose(t, S.knots[k]):
+            continue
+
+        a1 = S.polynomials[k].coef[1]
+
+        if is_unstable_point(a1, sign):
+            deltas.append(Delta(S, k, t, sign))
+
+    return deltas
+
+
+def subdifferential(S, U):
+    # ∑_{Δ_j ∈ U} Δ_j
+    superdiff = C(U, D=None)
+
+    # S - superdifferential
+    S_minus_superdiff = [x - y for x in S for y in superdiff]
+
+    # C_Δ = 0 - ∑_{Δ_j ≠ Δ} Δ_j
+    C_delta_union = [v for D in U for v in -C(U, D)]  # JULIEN!!!!!!!!! check empty U
+
+    return np.concatenate([S_minus_superdiff, C_delta_union])
+
+
 def subgradients(basis, S, signs):
     """Compute the subgradients"""
     P = GRA.build_P(basis, S.knots, S.degree)
     P = P.T
-    print(len(S.knots))
     M = np.zeros((len(S.knots) - 2, P.shape[1]))
     a = [p.coef[1:] for p in S.polynomials]
     for i, knot in enumerate(S.knots[1:-1]):
@@ -29,7 +111,6 @@ def subgradients(basis, S, signs):
                 M[i, col] = sum(
                     -(j + 1) * a[i][j] * (t - knot) ** j for j in range(S.degree)
                 )
-
             col += 1
 
     G = np.concatenate([np.ones((1, P.shape[1])), P, M], axis=0)
@@ -40,6 +121,11 @@ def subgradients(basis, S, signs):
 
 def descent_direction(basis, S, signs):
     """Solve the QP to find the descent direction for Psi bar"""
+    S_set = build_stable_set_S(basis, S, signs)
+    U = build_unstable_set_U(basis, S, signs)
+    print("Stable points:", len(S_set))
+    print("Unstable points:", len(U))
+
     G = subgradients(basis, S, signs)
     P = G.T @ G
     q = np.zeros(G.shape[1])
@@ -69,10 +155,13 @@ def simplex_system(f, samples, knots, m):
 
 def Psi_bar(f, knots, m, nsamples):
     """Evaluate Psi bar at the given knots and return the approximation and signs of the deviation."""
-    # nsamples = 1000
     samples = np.linspace(knots[0], knots[-1], nsamples)
-    A, b = simplex_system(f, samples, knots, m)
 
+    # Include knots in the samples
+    samples = np.unique(np.concatenate([samples, np.asarray(knots)]))
+    nsamples = len(samples)
+
+    A, b = simplex_system(f, samples, knots, m)
     prob = pl.LpProblem("simplex", pl.LpMinimize)
 
     # Create variables for the coefficients and the deviation
@@ -100,7 +189,6 @@ def Psi_bar(f, knots, m, nsamples):
 
     # The active constraints should give us the maximum deviation points:
     active = [int(name) for name, c in list(prob.constraints.items()) if c.slack == 0]
-    print(active)
     t_active = np.array(
         [
             [samples[i], -1] if i < nsamples else [samples[i - nsamples], 1]
@@ -113,17 +201,56 @@ def Psi_bar(f, knots, m, nsamples):
     basis = t_active[:, 0]  # [t for [t, _] in t_active]
     signs = t_active[:, 1]  # [s for [_, s] in t_active]
 
+    # print("Active points (basis and signs):")
+    # for t, sign in zip(basis, signs):
+    #     print(f"t={t:+.8f}, sign={sign:+.0f} ")
+
     # Extract the coefficients from the solution and construct the spline approximation
     coefs = np.array([x[j].varValue for j in range(A.shape[1])])
-    print(f"Coefficients: {coefs}")
+    # print(f"Coefficients: {coefs}")
     S = Spline.SUSpline.from_coefficients(knots, m, coefs)
     A = Spline.Approximation(f, S, [knots[0], knots[-1]], basis=basis)
+
+    # sample_step = samples[1] - samples[0]
+    # bdev = abs(A.deviation(basis))
+    # tol = abs(sample_step) * 1e-6
+    # bsel0 = basis[1] - basis[0] > sample_step + tol or bdev[0] > bdev[1]
+    # bsel1 = (bdev[1:-1] > bdev[:-2]) | (basis[1:-1] - basis[:-2] > sample_step + tol)
+    # bsel2 = (bdev[1:-1] > bdev[2:]) | (basis[2:] - basis[1:-1] > sample_step + tol)
+    # bselend = basis[-1] - basis[-2] > sample_step + tol or bdev[-2] > bdev[-2]
+    # bsel = np.concatenate(([bsel0], bsel1 & bsel2, [bselend]))
+
+    # new_basis = basis[bsel]
+    # new_signs = signs[bsel]
+
+    # sample_step = samples[1] - samples[0]
+    # new_basis = []
+    # new_signs = []
+    # i = j = 0
+    # while i < len(basis):
+    #     while (
+    #         j + 1 < len(basis)
+    #         and np.isclose(basis[j + 1] - basis[j], sample_step)
+    #         and abs(A.deviation(basis[j + 1])) > abs(A.deviation(basis[j]))
+    #     ):
+    #         j = j + 1
+    #     j_max = j
+    #     while (
+    #         j + 1 < len(basis)
+    #         and np.isclose(basis[j + 1] - basis[j], sample_step)
+    #         and abs(A.deviation(basis[j + 1])) < abs(A.deviation(basis[j]))
+    #     ):
+    #         j = j + 1
+
+    #     new_basis.append(basis[j_max])
+    #     new_signs.append(signs[j_max])
+    #     i = j = j + 1
+    # A.basis = new_basis
 
     return z.varValue, A, signs
 
 
 def Psi_bar_dual(f, knots, m, nsamples):
-    # nsamples = 1000
     samples = np.linspace(knots[0], knots[-1], nsamples)
     A, b = simplex_system(f, samples, knots, m)
 
@@ -204,7 +331,6 @@ def armijo_line_search(f, knots, m, d, nsamples, rho=0.5, c=0.1):
 
 def evaluate_and_get_direction(f, knots, m, nsamples):
     """Evaluate Psi bar at the given knots and return the descent direction, spline, approximation, and deviation."""
-    # Evaluate Psi bar at the given knots
     deviation, approx, signs = Psi_bar(f, knots, m, nsamples=nsamples)
 
     # Compute the descent direction using the subgradients and the simplex system
@@ -229,20 +355,9 @@ def descent_algorithm(theta_start, f, a, b, m, k, nsamples=1000, track_iterates=
     for iteration in range(100):
         d, S, _, _ = evaluate_and_get_direction(f, knots, m, nsamples=nsamples)
         knot_direction = d[-k:]
-        print(f"knot direction: {knot_direction}")
-
-        # eps = 1e-3
-        # knots_plus = knots.copy()
-        # knots_minus = knots.copy()
-        # knots_plus[1:-1] += eps * knot_direction
-        # knots_minus[1:-1] -= eps * knot_direction
-        # z_plus, _, _ = Psi_bar(f, knots_plus, m, nsamples=nsamples)
-        # z_minus, _, _ = Psi_bar(f, knots_minus, m, nsamples=nsamples)
-        # if z_minus < z_plus:
-        #     knot_direction = -knot_direction
 
         d_norm = np.linalg.norm(knot_direction)
-        print(f"Iteration {iteration}: ||d|| = {d_norm:.6f}")
+
         if d_norm < 1e-5:
             break
 
@@ -265,12 +380,11 @@ def descent_algorithm(theta_start, f, a, b, m, k, nsamples=1000, track_iterates=
 
     # Final evaluation of Psi bar at the last knots
     final_dev, approx, signs = Psi_bar(f, knots, m, nsamples=nsamples)
-    print(f"signs: {signs}")
 
     if track_iterates:
-        return knots, S, approx, iteration, final_dev, iterates
+        return knots, signs, S, approx, iteration, final_dev, iterates
 
-    return knots, S, approx, iteration, final_dev
+    return knots, signs, S, approx, iteration, final_dev
 
 
 def insert_extra_knots(knots, k):
@@ -291,9 +405,112 @@ def insert_extra_knots(knots, k):
     return knots
 
 
+def minimal_chain_bisection(f, function_label, a, b, k, m):
+    theta_min, theta_max = a, b
+    eps = 1e-5
+    iteration = 0
+    nsamples = 10000
+
+    def result_dict(
+        theta_mid,
+        exit_reason,
+        counts,
+        deviation,
+        A,
+        signs,
+        optimal_knots=None,
+        A_after=None,
+        signs_after=None,
+        descent_iterations=None,
+        final_deviation=None,
+    ):
+        return {
+            "theta_min": theta_min,
+            "theta_max": theta_max,
+            "theta_mid": theta_mid,
+            "bisection_iterations": iteration,
+            "exit_reason": exit_reason,
+            "counts_before_descent": counts,
+            "deviation_before_descent": deviation,
+            "alt_pts_before_descent": A.basis if A is not None else None,
+            "signs_before_descent": signs,
+            "optimal_knots": optimal_knots,
+            "counts_after_descent": (
+                A_after.alternance_per_interval(A_after.basis, signs_after)
+                if A_after is not None and signs_after is not None
+                else None
+            ),
+            "descent_iterations": descent_iterations,
+            "deviation_after_descent": final_deviation,
+            "alt_pts_after_descent": (A_after.basis if A_after is not None else None),
+        }
+
+    while theta_max - theta_min > eps:
+        theta_mid = (theta_min + theta_max) / 2
+        knots = [a, theta_mid, b]
+
+        deviation, A, signs = Psi_bar(f, knots, m, nsamples=nsamples)
+
+        counts = A.alternance_per_interval(A.basis, signs)
+
+        if counts[0] >= m + 2 and counts[1] >= m + 2:
+            plotting.plot_single(
+                A,
+                points=A.basis,
+                file_name=f"{function_label}_minimal_chain_bisection_k{k}_m{m}",
+            )
+            return result_dict(theta_mid, "m+2|m+2", counts, deviation, A, signs)
+        if counts[0] >= m + 2:
+            theta_max = theta_mid
+        elif counts[1] >= m + 2:
+            theta_min = theta_mid
+        elif counts == [m + 1, m + 1]:
+            optimal_knots, signs_after, S, A_after, descent_iterations, final_z = (
+                descent_algorithm([theta_mid], f, a, b, m, k, nsamples=nsamples)
+            )
+            z, A_after, signs_after = Psi_bar(f, optimal_knots, m, nsamples=nsamples)
+            plotting.plot_single(
+                A_after,
+                points=A_after.basis,
+                file_name=f"{function_label}_minimal_chain_bisection_k{k}_m{m}",
+            )
+            return result_dict(
+                theta_mid,
+                "m+1|m+1",
+                counts,
+                deviation,
+                A,
+                signs,
+                optimal_knots=optimal_knots,
+                A_after=A_after,
+                signs_after=signs_after,
+                descent_iterations=descent_iterations,
+                final_deviation=final_z,
+            )
+        else:
+            return result_dict(
+                theta_mid, "something weird", counts, deviation, A, signs
+            )
+        iteration += 1
+
+    theta_mid = (theta_min + theta_max) / 2
+    deviation, A, signs = Psi_bar(f, [a, theta_mid, b], m, nsamples=nsamples)
+    plotting.plot_single(
+        A,
+        points=A.basis,
+        file_name=f"{function_label}_minimal_chain_bisection_k{k}_m{m}",
+    )
+    counts = A.alternance_per_interval(A.basis, signs)
+    if counts[0] >= m + 2 and counts[1] >= m + 2:
+        return result_dict(theta_mid, "m+2|m+2", counts, deviation, A, signs)
+    else:
+        return result_dict(
+            theta_mid, "theta_max - theta_min < eps", counts, deviation, A, signs
+        )
+
+
 if __name__ == "__main__":
-    # Example usage of the descent algorithm with a test function
-    function_name = "sin_if_else"
+    function_name = "g"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
     function_label = test_functions.FUNCTION_LABELS[function_name]
 
@@ -301,32 +518,44 @@ if __name__ == "__main__":
     k = 1
     m = 3
 
-    x_min_knots, x_max_knots = nurnberger_mod.get_knots(f, a, b, k, m)
-    theta_start = x_min_knots
+    # knots = [a, 3, b]
+    # z, A, signs = Psi_bar(f, knots, m, nsamples=1000)
+    # knots = [0.2855]
+    result = minimal_chain_bisection(f, function_name, a, b, k, m)
+    # knots = [a, result["theta_mid"], b]
+    # z, A, signs = Psi_bar(f, knots, m, nsamples=1000)
 
-    # If the number of internal knots is not equal to k, insert extra knots
-    if len(theta_start) != k:
-        theta_start = insert_extra_knots(theta_start, k)
+    opt_knots, signs, S, A, iterations, z, iterates = descent_algorithm(
+        [result["theta_mid"]], f, a, b, m, k, nsamples=1001, track_iterates=True
+    )
+    # print(f"alt pts={A.basis}")
+    # print(f"z={z}, counts={A.alternance_per_interval(A.basis, signs)}")
 
-    # z, A, signs = Psi_bar(f, np.concatenate([[a], theta_start, [b]]), m)
+    # plotting.plot_single(
+    #     A,
+    #     points=A.basis,
+    #     file_name=f"z_{function_name}_k{k}_m{m}_1000_1e-4_3-2",
+    # )
 
-    zd, Ad, signsd = Psi_bar_dual(f, np.concatenate([[a], theta_start, [b]]), m)
+    npz_path = Path(
+        f"psi_surfaces_10000_simplex/psi_surface_{function_name}_k{k}_m{m}_10000.npz"
+    )
+    data = np.load(npz_path)
+    thetas = data["theta_values"]
+    psi_values = data["psi_values"]
 
-    # # Run the descent algorithm to find the optimal internal knots
-    optimal_knots, S, A, iteration, deviation, iterates = descent_algorithm(
-        theta_start, f, a, b, m, k, track_iterates=True
+    plotting.plot_objective_psi_bar(
+        thetas,
+        psi_values,
+        opt_knots[1],
+        z,
+        theta_path=iterates,
+        file_name=f"psi_{function_name}_k{k}_m{m}_descent_path",
     )
 
-    print(f"Optimal internal knots: {optimal_knots[1:-1]}")
-    print(f"Optimal Psi bar value: {deviation}")
-    print(f"basis/alt pts: {A.basis}")
-
-    # # Plot the spline approximation
-    plotting.plot_single(
-        A,
-        points=A.basis,
-        f_label=function_label,
-        approximation_label=rf"$s^*_{{{m}}}(t)$",
-        title=f"Descent algorithm for {function_label} with {k} internal knots and degree {m}",
-        file_name=f"{function_name}_k{k}_m{m}",
-    )
+    # plotting.plot_psi_bar_regions(
+    #     npz, file_name=f"z_psi_bar_{function_name}_k{k}_m{m}_1000_1e-4"
+    # )
+    # result = minimal_chain_bisection(f, function_name, a, b, k, m)
+    # for key, value in result.items():
+    #     print(f"{key}: {value}")

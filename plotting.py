@@ -432,7 +432,7 @@ def plot_objective_psi_bar(
         label=r"$\psi(\theta_1)$",
     )
 
-    # Find the minimum psi value and its corresponding theta from samples
+    # # Find the minimum psi value and its corresponding theta from samples
     min_index = np.argmin(psi_values)
     theta_min = thetas[min_index]
     psi_min = psi_values[min_index]
@@ -506,10 +506,10 @@ def plot_objective_psi_bar(
             _psi_bar_at(nurnbergers_orig_point, thetas, psi_values),
             marker="o",
             color="black",
-            s=40,
+            s=60,
             linewidths=2,
             zorder=6,
-            label=rf"$\theta_1^{{\mathrm{{orig}}}}={nurnbergers_orig_point:.3f}$",
+            # label=rf"$\theta_1^{{\mathrm{{orig}}}}={nurnbergers_orig_point:.3f}$",
         )
 
     if nurnbergers_mod_point is not None:
@@ -521,7 +521,7 @@ def plot_objective_psi_bar(
             s=40,
             linewidths=2,
             zorder=6,
-            label=rf"$\theta_1^{{\mathrm{{mod}}}}={nurnbergers_mod_point:.3f}$",
+            # label=rf"$\theta_1^{{\mathrm{{mod}}}}={nurnbergers_mod_point:.3f}$",
         )
     # Path taken by the algorithm
     if theta_path is not None:
@@ -752,6 +752,58 @@ def plot_objective_psi_bar_contour(
     return (theta_1_min, theta_2_min), psi_min
 
 
+def plot_psi_bar_regions(npz_file, file_name=None):
+    data = np.load(npz_file)
+
+    thetas = data["thetas"]
+    psi_values = data["psi_values"]
+    region_types = data["region_types"]
+
+    colours = {
+        "left": "red",
+        "right": "orange",
+        "m+1|m+1": "blue",
+        "m+2|m+2": "green",
+        "other": "grey",
+    }
+
+    labels = {
+        "left": r"$m+2$ on $[a,\theta]$",
+        "right": r"$m+2$ on $[\theta,b]$",
+        "m+1|m+1": r"$m+1 \mid m+1$",
+        "m+2|m+2": r"$m+2 \mid m+2$",
+        "other": "Other",
+    }
+
+    fig, ax = plt.subplots(figsize=(7, 5))
+    ax.plot(thetas, psi_values, color="black")
+
+    for region, colour in colours.items():
+        mask = region_types == region
+
+        if np.any(mask):
+            ax.scatter(
+                thetas[mask],
+                psi_values[mask],
+                color=colour,
+                s=8,
+                label=labels[region],
+                zorder=2,
+            )
+
+    ax.set_xlabel(r"$\theta$")
+    ax.set_ylabel(r"$\bar{\Psi}(\theta)$")
+    ax.ticklabel_format(axis="y", style="plain", useOffset=False)
+
+    ax.legend()
+    fig.tight_layout()
+
+    if file_name is not None:
+        _save_figure(fig, file_name)
+
+    plt.show()
+
+
 def plot_objective_psi_bar_3d(
     theta_1_values,
     theta_2_values,
@@ -759,6 +811,8 @@ def plot_objective_psi_bar_3d(
     theta_found=None,
     theta_path=None,
     file_name=None,
+    nurnbergers_orig_point=None,
+    nurnbergers_mod_point=None,
     title=None,
     figsize=(7, 5),
 ):
@@ -873,7 +927,50 @@ def plot_objective_psi_bar_3d(
                 rf"$\hat{{\theta}}=" rf"({theta_found[0]:.3f},{theta_found[1]:.3f})$"
             ),
         )
-
+    if nurnbergers_orig_point is not None:
+        psi_orig = _psi_bar_at_3d(
+            nurnbergers_orig_point,
+            theta_1_values,
+            theta_2_values,
+            psi_values,
+        )[0]
+        ax.scatter(
+            nurnbergers_orig_point[0],
+            nurnbergers_orig_point[1],
+            psi_orig,
+            marker="o",
+            color="black",
+            s=15,
+            linewidths=1,
+            depthshade=False,
+            zorder=12,
+            label=(
+                rf"$\theta^{{\mathrm{{orig}}}}="
+                rf"({nurnbergers_orig_point[0]:.3f},{nurnbergers_orig_point[1]:.3f})$"
+            ),
+        )
+    if nurnbergers_mod_point is not None:
+        psi_mod = _psi_bar_at_3d(
+            nurnbergers_mod_point,
+            theta_1_values,
+            theta_2_values,
+            psi_values,
+        )[0]
+        ax.scatter(
+            nurnbergers_mod_point[0],
+            nurnbergers_mod_point[1],
+            psi_mod,
+            marker="o",
+            color=HIGHLIGHT_COLOUR,
+            s=15,
+            linewidths=1,
+            depthshade=False,
+            zorder=12,
+            label=(
+                rf"$\theta^{{\mathrm{{mod}}}}="
+                rf"({nurnbergers_mod_point[0]:.3f},{nurnbergers_mod_point[1]:.3f})$"
+            ),
+        )
     ax.xaxis.pane.fill = False
     ax.yaxis.pane.fill = False
     ax.zaxis.pane.fill = False
