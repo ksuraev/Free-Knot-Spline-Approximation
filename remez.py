@@ -97,7 +97,7 @@ def run(f, a, b, m, max_iter=10000, verbose=False):
             return approx
 
         # Update the basis points using VP exchange
-        basis_dev = f(basis) - P(basis)
+        basis_dev = P(basis) - f(basis)
         basis = exchange(basis, t_max, d_max, basis_dev)
 
     approx = Spline.Approximation(f, P, [a, b], basis)

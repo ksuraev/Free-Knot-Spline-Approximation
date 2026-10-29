@@ -510,26 +510,33 @@ def minimal_chain_bisection(f, function_label, a, b, k, m):
 
 
 if __name__ == "__main__":
-    function_name = "g"
+    function_name = "cos"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
     function_label = test_functions.FUNCTION_LABELS[function_name]
 
     a, b = test_functions.INTERVALS[function_name]
     k = 1
-    m = 3
+    m = 1
 
     # knots = [a, 3, b]
     # z, A, signs = Psi_bar(f, knots, m, nsamples=1000)
     # knots = [0.2855]
-    result = minimal_chain_bisection(f, function_name, a, b, k, m)
+    # result = minimal_chain_bisection(f, function_name, a, b, k, m)
     # knots = [a, result["theta_mid"], b]
     # z, A, signs = Psi_bar(f, knots, m, nsamples=1000)
 
+    x_min_knots, x_max_knots = nurnberger_mod.get_knots(f, a, b, k, m)
+    print(f"x_min_knots={x_min_knots}, x_max_knots={x_max_knots}")
+
+    if len(x_min_knots) != k:
+        x_min_knots = insert_extra_knots(x_min_knots, k)
+
     opt_knots, signs, S, A, iterations, z, iterates = descent_algorithm(
-        [result["theta_mid"]], f, a, b, m, k, nsamples=1001, track_iterates=True
+        x_min_knots, f, a, b, m, k, nsamples=1001, track_iterates=True
     )
-    # print(f"alt pts={A.basis}")
-    # print(f"z={z}, counts={A.alternance_per_interval(A.basis, signs)}")
+    print(f"opt knots={opt_knots}")
+    print(f"alt pts={A.basis}")
+    print(f"z={z}, counts={A.alternance_per_interval(A.basis, signs)}")
 
     # plotting.plot_single(
     #     A,
