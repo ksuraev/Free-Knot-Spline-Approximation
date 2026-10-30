@@ -37,7 +37,7 @@ def Delta(S, j, t, sign):
 def C(U, D=None):
     if len(U) == 0:
         return [0]  # single element? or array of zeros?
-    if D is not None and U[0] == D:
+    if D is not None and U[0] is D:
         return C(U[1:], D)
     return np.concatenate([[x + y for y in C(U[1:], D)] for x in U[0]])
 
@@ -60,6 +60,7 @@ def build_stable_set_S(basis, S, signs):
 
             if is_unstable_point(a1, sign):
                 continue
+
             betas.append(beta(S, k - 1, t, sign))
 
         betas.append(beta(S, k, t, sign))
@@ -85,59 +86,104 @@ def build_unstable_set_U(basis, S, signs):
     return deltas
 
 
+# ∑_{Δ_j ∈ U} Δ_j
+def superdifferential(U):
+    return C(U, D=None)
+
+
 def subdifferential(S, U):
-    # ∑_{Δ_j ∈ U} Δ_j
-    superdiff = C(U, D=None)
+    if len(U) == 0:
+        return np.array(S)  # no clue if this is right but fails otherwise
+
+    superdiff = superdifferential(U)
 
     # S - superdifferential
     S_minus_superdiff = [x - y for x in S for y in superdiff]
 
     # C_Δ = 0 - ∑_{Δ_j ≠ Δ} Δ_j
-    C_delta_union = [v for D in U for v in -C(U, D)]  # JULIEN!!!!!!!!! check empty U
+    zero = np.zeros_like(U[0][0])
+    C_delta_union = [
+        zero - v for D in U for v in C(U, D)
+    ]  # JULIEN!!!!!!!!! check empty U
 
     return np.concatenate([S_minus_superdiff, C_delta_union])
 
 
-def subgradients(basis, S, signs):
-    """Compute the subgradients"""
-    P = GRA.build_P(basis, S.knots, S.degree)
-    P = P.T
-    M = np.zeros((len(S.knots) - 2, P.shape[1]))
-    a = [p.coef[1:] for p in S.polynomials]
-    for i, knot in enumerate(S.knots[1:-1]):
-        col = 0
-        for t in basis:
-            if t > knot:
-                M[i, col] = sum(
-                    -(j + 1) * a[i][j] * (t - knot) ** j for j in range(S.degree)
-                )
-            col += 1
+def closest_subgradient(subdiff, v):
+    G = subdiff.T
 
-    G = np.concatenate([np.ones((1, P.shape[1])), P, M], axis=0)
-    G = np.multiply(G, signs)
+    P = G.T @ G
+    q = -G.T @ v
 
-    return G
+    A = np.ones((1, G.shape[1]))
+    b = np.ones(1)
+    lb = np.zeros(G.shape[1])
+
+    problem = qpsolvers.Problem(P, q, None, None, A, b, lb=lb)
+    sol = qpsolvers.solve_problem(problem, solver="proxqp")
+
+    return G @ sol.x
 
 
 def descent_direction(basis, S, signs):
-    """Solve the QP to find the descent direction for Psi bar"""
     S_set = build_stable_set_S(basis, S, signs)
-    U = build_unstable_set_U(basis, S, signs)
-    print("Stable points:", len(S_set))
-    print("Unstable points:", len(U))
+    U_set = build_unstable_set_U(basis, S, signs)
 
-    G = subgradients(basis, S, signs)
-    P = G.T @ G
-    q = np.zeros(G.shape[1])
-    A = np.ones(G.shape[1])
-    b = np.ones(1)
+    subdiff = subdifferential(S_set, U_set)
+    if len(U_set) == 0:
+        superdiff = np.zeros((1, subdiff.shape[1]))
+    else:
+        superdiff = superdifferential(U_set)
 
-    problem = qpsolvers.Problem(P, q, None, None, A, b, lb=q)
-    solution = qpsolvers.solve_problem(problem, solver="proxqp")
+    max_norm = -np.inf
+    best_direction = None
 
-    x = solution.x
-    v = G @ x
-    return -v
+    for w in superdiff:
+        v = -w
+        u = closest_subgradient(subdiff, v)
+        direction = v - u
+
+        if np.linalg.norm(direction) > max_norm:
+            max_norm = np.linalg.norm(direction)
+            best_direction = direction
+
+    return best_direction
+
+
+# def subgradients(basis, S, signs):
+#     """Compute the subgradients"""
+#     P = GRA.build_P(basis, S.knots, S.degree)
+#     P = P.T
+#     M = np.zeros((len(S.knots) - 2, P.shape[1]))
+#     a = [p.coef[1:] for p in S.polynomials]
+#     for i, knot in enumerate(S.knots[1:-1]):
+#         col = 0
+#         for t in basis:
+#             if t > knot:
+#                 M[i, col] = sum(
+#                     -(j + 1) * a[i][j] * (t - knot) ** j for j in range(S.degree)
+#                 )
+#             col += 1
+
+#     G = np.concatenate([np.ones((1, P.shape[1])), P, M], axis=0)
+#     G = np.multiply(G, signs)
+#     return G
+
+
+# def descent_direction(basis, S, signs):
+#     """Solve the QP to find the descent direction for Psi bar"""
+#     G = subgradients(basis, S, signs)
+#     P = G.T @ G
+#     q = np.zeros(G.shape[1])
+#     A = np.ones(G.shape[1])
+#     b = np.ones(1)
+
+#     problem = qpsolvers.Problem(P, q, None, None, A, b, lb=q)
+#     solution = qpsolvers.solve_problem(problem, solver="proxqp")
+
+#     x = solution.x
+#     v = G @ x
+#     return -v
 
 
 def simplex_system(f, samples, knots, m):
@@ -191,7 +237,7 @@ def Psi_bar(f, knots, m, nsamples):
     active = [int(name) for name, c in list(prob.constraints.items()) if c.slack == 0]
     t_active = np.array(
         [
-            [samples[i], -1] if i < nsamples else [samples[i - nsamples], 1]
+            [samples[i], 1] if i < nsamples else [samples[i - nsamples], -1]
             for i in active
         ]
     )
@@ -348,10 +394,6 @@ def descent_algorithm(theta_start, f, a, b, m, k, nsamples=1000, track_iterates=
     if track_iterates:
         iterates = [theta_start.copy()]
 
-    # Track the previous d norm and the number of iterations with unchanged norm
-    previous_d_norm = None
-    unchanged_count = 0
-
     for iteration in range(100):
         d, S, _, _ = evaluate_and_get_direction(f, knots, m, nsamples=nsamples)
         knot_direction = d[-k:]
@@ -361,25 +403,19 @@ def descent_algorithm(theta_start, f, a, b, m, k, nsamples=1000, track_iterates=
         if d_norm < 1e-5:
             break
 
-        # Stop if ||d|| has not changed for 5 iterations
-        if previous_d_norm is not None and np.isclose(d_norm, previous_d_norm):
-            unchanged_count += 1
-        else:
-            unchanged_count = 0
-
-        if unchanged_count >= 5:
-            break
-
-        previous_d_norm = d_norm
-
         # Use Armijo line search to find the next knots in the direction of d
-        knots = armijo_line_search(f, knots, m, knot_direction, nsamples=nsamples)
+        new_knots = armijo_line_search(f, knots, m, knot_direction, nsamples=nsamples)
+
+        if np.allclose(new_knots, knots):
+            break
+        knots = new_knots
 
         if track_iterates:
             iterates.append(knots[1:-1].copy())
 
     # Final evaluation of Psi bar at the last knots
     final_dev, approx, signs = Psi_bar(f, knots, m, nsamples=nsamples)
+    S = approx.g
 
     if track_iterates:
         return knots, signs, S, approx, iteration, final_dev, iterates
@@ -405,45 +441,9 @@ def insert_extra_knots(knots, k):
     return knots
 
 
-def minimal_chain_bisection(f, function_label, a, b, k, m):
+def minimal_chain_bisection(f, a, b, m, nsamples=1000):
     theta_min, theta_max = a, b
     eps = 1e-5
-    iteration = 0
-    nsamples = 10000
-
-    def result_dict(
-        theta_mid,
-        exit_reason,
-        counts,
-        deviation,
-        A,
-        signs,
-        optimal_knots=None,
-        A_after=None,
-        signs_after=None,
-        descent_iterations=None,
-        final_deviation=None,
-    ):
-        return {
-            "theta_min": theta_min,
-            "theta_max": theta_max,
-            "theta_mid": theta_mid,
-            "bisection_iterations": iteration,
-            "exit_reason": exit_reason,
-            "counts_before_descent": counts,
-            "deviation_before_descent": deviation,
-            "alt_pts_before_descent": A.basis if A is not None else None,
-            "signs_before_descent": signs,
-            "optimal_knots": optimal_knots,
-            "counts_after_descent": (
-                A_after.alternance_per_interval(A_after.basis, signs_after)
-                if A_after is not None and signs_after is not None
-                else None
-            ),
-            "descent_iterations": descent_iterations,
-            "deviation_after_descent": final_deviation,
-            "alt_pts_after_descent": (A_after.basis if A_after is not None else None),
-        }
 
     while theta_max - theta_min > eps:
         theta_mid = (theta_min + theta_max) / 2
@@ -454,63 +454,21 @@ def minimal_chain_bisection(f, function_label, a, b, k, m):
         counts = A.alternance_per_interval(A.basis, signs)
 
         if counts[0] >= m + 2 and counts[1] >= m + 2:
-            plotting.plot_single(
-                A,
-                points=A.basis,
-                file_name=f"{function_label}_minimal_chain_bisection_k{k}_m{m}",
-            )
-            return result_dict(theta_mid, "m+2|m+2", counts, deviation, A, signs)
+            return theta_mid
         if counts[0] >= m + 2:
             theta_max = theta_mid
         elif counts[1] >= m + 2:
             theta_min = theta_mid
         elif counts == [m + 1, m + 1]:
-            optimal_knots, signs_after, S, A_after, descent_iterations, final_z = (
-                descent_algorithm([theta_mid], f, a, b, m, k, nsamples=nsamples)
-            )
-            z, A_after, signs_after = Psi_bar(f, optimal_knots, m, nsamples=nsamples)
-            plotting.plot_single(
-                A_after,
-                points=A_after.basis,
-                file_name=f"{function_label}_minimal_chain_bisection_k{k}_m{m}",
-            )
-            return result_dict(
-                theta_mid,
-                "m+1|m+1",
-                counts,
-                deviation,
-                A,
-                signs,
-                optimal_knots=optimal_knots,
-                A_after=A_after,
-                signs_after=signs_after,
-                descent_iterations=descent_iterations,
-                final_deviation=final_z,
-            )
+            return theta_mid
         else:
-            return result_dict(
-                theta_mid, "something weird", counts, deviation, A, signs
-            )
-        iteration += 1
+            raise RuntimeError(f"Unexpected alternance counts {counts}")
 
-    theta_mid = (theta_min + theta_max) / 2
-    deviation, A, signs = Psi_bar(f, [a, theta_mid, b], m, nsamples=nsamples)
-    plotting.plot_single(
-        A,
-        points=A.basis,
-        file_name=f"{function_label}_minimal_chain_bisection_k{k}_m{m}",
-    )
-    counts = A.alternance_per_interval(A.basis, signs)
-    if counts[0] >= m + 2 and counts[1] >= m + 2:
-        return result_dict(theta_mid, "m+2|m+2", counts, deviation, A, signs)
-    else:
-        return result_dict(
-            theta_mid, "theta_max - theta_min < eps", counts, deviation, A, signs
-        )
+    return (theta_min + theta_max) / 2
 
 
 if __name__ == "__main__":
-    function_name = "cos"
+    function_name = "log"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
     function_label = test_functions.FUNCTION_LABELS[function_name]
 
@@ -518,51 +476,43 @@ if __name__ == "__main__":
     k = 1
     m = 1
 
-    # knots = [a, 3, b]
-    # z, A, signs = Psi_bar(f, knots, m, nsamples=1000)
-    # knots = [0.2855]
-    # result = minimal_chain_bisection(f, function_name, a, b, k, m)
-    # knots = [a, result["theta_mid"], b]
-    # z, A, signs = Psi_bar(f, knots, m, nsamples=1000)
+    # x_min_knots, x_max_knots = nurnberger_mod.get_knots(f, a, b, k, m)
 
-    x_min_knots, x_max_knots = nurnberger_mod.get_knots(f, a, b, k, m)
-    print(f"x_min_knots={x_min_knots}, x_max_knots={x_max_knots}")
+    # if len(x_min_knots) != k:
+    #     x_min_knots = insert_extra_knots(x_min_knots, k)
 
-    if len(x_min_knots) != k:
-        x_min_knots = insert_extra_knots(x_min_knots, k)
+    # opt_knots, signs, S, A, iterations, z, iterates = descent_algorithm(
+    #     x_min_knots, f, a, b, m, k, nsamples=1001, track_iterates=True
+    # )
 
+    initial_knots = minimal_chain_bisection(f, a, b, m, nsamples=1001)
+    # z, A, signs = Psi_bar(f, np.array([a, initial_knots, b]), m, nsamples=1001)
     opt_knots, signs, S, A, iterations, z, iterates = descent_algorithm(
-        x_min_knots, f, a, b, m, k, nsamples=1001, track_iterates=True
+        [initial_knots], f, a, b, m, k, nsamples=1001, track_iterates=True
     )
+    print(f"initial knots={initial_knots}")
     print(f"opt knots={opt_knots}")
     print(f"alt pts={A.basis}")
     print(f"z={z}, counts={A.alternance_per_interval(A.basis, signs)}")
 
-    # plotting.plot_single(
-    #     A,
-    #     points=A.basis,
-    #     file_name=f"z_{function_name}_k{k}_m{m}_1000_1e-4_3-2",
-    # )
-
-    npz_path = Path(
-        f"psi_surfaces_10000_simplex/psi_surface_{function_name}_k{k}_m{m}_10000.npz"
-    )
-    data = np.load(npz_path)
-    thetas = data["theta_values"]
-    psi_values = data["psi_values"]
-
-    plotting.plot_objective_psi_bar(
-        thetas,
-        psi_values,
-        opt_knots[1],
-        z,
-        theta_path=iterates,
-        file_name=f"psi_{function_name}_k{k}_m{m}_descent_path",
+    plotting.plot_single(
+        A,
+        points=A.basis,
+        file_name=f"z_{function_name}_k{k}_m{m}_final",
     )
 
-    # plotting.plot_psi_bar_regions(
-    #     npz, file_name=f"z_psi_bar_{function_name}_k{k}_m{m}_1000_1e-4"
+    # npz_path = Path(
+    #     f"psi_surfaces_10000_simplex/psi_surface_{function_name}_k{k}_m{m}_10000.npz"
     # )
-    # result = minimal_chain_bisection(f, function_name, a, b, k, m)
-    # for key, value in result.items():
-    #     print(f"{key}: {value}")
+    # data = np.load(npz_path)
+    # thetas = data["theta_values"]
+    # psi_values = data["psi_values"]
+
+    # plotting.plot_objective_psi_bar(
+    #     thetas,
+    #     psi_values,
+    #     opt_knots[1],
+    #     z,
+    #     theta_path=iterates,
+    #     file_name=f"z_psi_{function_name}_k{k}_m{m}_descent_path",
+    # )
