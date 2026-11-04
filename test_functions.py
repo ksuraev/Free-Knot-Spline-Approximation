@@ -59,6 +59,10 @@ def f_g(t):
     return 0.5 * (f_exp_sin_cos(t) - g(t))
 
 
+def f_sin_dense_flat(t):
+    return np.where(t <= 0.1, np.sin(40 * np.pi * t), 0.0)
+
+
 TEST_FUNCTIONS = {
     "g": (g, r"$e^t(q(1.5t) + 2p(t) + 0.5q(0.5t))$"),
     "cos_weird": (
@@ -81,6 +85,7 @@ TEST_FUNCTIONS = {
         r"$e^t(\sin(3\pi t) + 2\cos(2\pi t) + 0.5\sin(\pi t))$",
     ),
     "f_g": (f_g, r"$0.5(f(t) - g(t))$"),
+    "sin_dense_flat": (f_sin_dense_flat, r"$\sin(40\pi t)$ if $t \leq 0.1$, else $0$"),
 }
 
 INTERVALS = {
@@ -96,6 +101,7 @@ INTERVALS = {
     "exp_sin_cos": (6, 8),
     "g": (-1, 1),
     "f_g": (-1, 1),
+    "sin_dense_flat": (0, 1),
 }
 
 # For report plotting use numbered f
