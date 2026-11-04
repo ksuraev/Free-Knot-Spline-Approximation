@@ -109,7 +109,10 @@ def get_knots(f, a, b, k, m, max_iter=100, verbose=False):
             break
 
         # target deviation for this iteration computed as geometric mean
-        d_n = (d_min * d_max) ** 0.5
+        if d_min == 0:
+            d_n = (d_min + d_max) / 2
+        else:
+            d_n = (d_min * d_max) ** 0.5
 
         current_x_min_knots = []
         current_x_max_knots = []
@@ -239,6 +242,8 @@ def discontinuous_spline(f, a, b, k, m, max_iter=100, verbose=False):
     """Construct the modified Nurnberger free-knot discontinuous spline approximation using x_min left knots."""
     knots, d_min, d_max = nurnberger.step_zero(f, a, b, k, m)
 
+    print(f"Initial knots: {knots}, d_min={d_min:.5f}, d_max={d_max:.5f}")
+
     x_min_knots = []
     x_max_knots = []
 
@@ -249,7 +254,10 @@ def discontinuous_spline(f, a, b, k, m, max_iter=100, verbose=False):
             break
 
         # target deviation for this iteration computed as geometric mean
-        d_n = (d_min * d_max) ** 0.5
+        if d_min == 0:
+            d_n = (d_min + d_max) / 2
+        else:
+            d_n = (d_min * d_max) ** 0.5
 
         new_knots = [a]
         new_approximations = []
@@ -314,17 +322,24 @@ def discontinuous_spline(f, a, b, k, m, max_iter=100, verbose=False):
 
 
 if __name__ == "__main__":
-    function_name = "cos_if_else"
+    function_name = "sin_dense_flat"
     f, f_label = test_functions.TEST_FUNCTIONS[function_name]
 
     a, b = test_functions.INTERVALS[function_name]
-    k = 4  # number of free knots (not including a and b)
+    k = 2  # number of free knots (not including a and b)
     m = 2  # degree of polynomial to fit
 
     approx, x_min_knots, x_max_knots = discontinuous_spline(f, a, b, k, m, verbose=True)
 
-    x_min_knots, x_max_knots = get_knots(f, a, b, k, m, max_iter=100, verbose=True)
-
-    x_min_knots_rev, x_max_knots_rev = get_knots_reverse(
-        f, a, b, k, m, max_iter=100, verbose=True
+    plotting.plot_single(
+        approx,
+        points=approx.basis,
+        f_label=f_label,
+        file_name=f"{function_name}_k{k}_m{m}_discontinuous_spline",
     )
+
+    # x_min_knots, x_max_knots = get_knots(f, a, b, k, m, max_iter=100, verbose=True)
+
+    # x_min_knots_rev, x_max_knots_rev = get_knots_reverse(
+    #     f, a, b, k, m, max_iter=100, verbose=True
+    # )
