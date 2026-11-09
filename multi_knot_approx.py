@@ -128,7 +128,7 @@ def closest_subgradient(subdiff, v):
     lb = np.zeros(G.shape[1])
 
     problem = qpsolvers.Problem(P, q, None, None, A, b, lb=lb)
-    sol = qpsolvers.solve_problem(problem, solver="proxqp", max_iter=20000)
+    sol = qpsolvers.solve_problem(problem, solver="proxqp", max_iter=50000)
     if sol is None:
         raise RuntimeError("QP returned no solution")
     if not sol.found:
@@ -439,7 +439,7 @@ def minimal_chain_bisection(f, a, b, m, nsamples=1000):
 
 
 # Increase α and that'll push the knots to the left, decrease it (still >0) and that'll push them to the right.
-def redistribute(knots, theta_min, theta_max, i, k, b, alpha=0.6):
+def redistribute(knots, theta_min, theta_max, i, k, b, alpha=0.7):
     a = knots[i]
 
     for j in range(i + 1, k + 1):
@@ -589,7 +589,7 @@ if __name__ == "__main__":
     function_label = test_functions.FUNCTION_LABELS[function_name]
 
     a, b = test_functions.INTERVALS[function_name]
-    k = 10
+    k = 5
     m = 1
 
     x_min_knots, x_max_knots = nurnberger_mod.get_knots(f, a, b, k, m)
@@ -603,21 +603,37 @@ if __name__ == "__main__":
     else:
         x_min_knots = [a, *x_min_knots, b]
 
-    # print("x_min_knots", np.asarray(x_min_knots))
+    print("x_min_knots", np.asarray(x_min_knots))
+    initial_x_min_z, initial_x_min_A, initial_x_min_signs = Psi_bar(
+        f, x_min_knots, m, nsamples=1000
+    )
+    initial_x_min_counts = initial_x_min_A.alternance_per_interval(
+        initial_x_min_A.basis, initial_x_min_signs
+    )
 
-    # min_chain_knots = minimal_chain_bisection_general(
-    #     x_min_knots, f, a, b, m, k, nsamples=1000
-    # )
-    # print(f"Initial knots: {min_chain_knots}")
+    min_chain_knots = minimal_chain_bisection_general(
+        x_min_knots, f, a, b, m, k, nsamples=1000
+    )
+    print(f"Initial knots: {min_chain_knots}")
 
-    # min_chain_knots = [a, *min_chain_knots, b]
+    min_chain_knots = [a, *min_chain_knots, b]
 
-    # initial_z, initial_A, initial_signs = Psi_bar(f, min_chain_knots, m, nsamples=1000)
-    # print("initial z", initial_z)
-    # print(
-    #     "initial counts",
-    #     initial_A.alternance_per_interval(initial_A.basis, initial_signs),
-    # )
+    initial_min_chain_z, initial_min_chain_A, initial_min_chain_signs = Psi_bar(
+        f, min_chain_knots, m, nsamples=1000
+    )
+    print("initial z", initial_min_chain_z)
+    print(
+        "initial counts",
+        initial_min_chain_A.alternance_per_interval(
+            initial_min_chain_A.basis, initial_min_chain_signs
+        ),
+    )
+
+    plotting.plot_single(
+        initial_min_chain_A,
+        points=initial_min_chain_A.basis,
+        file_name=f"z_{function_name}_k{k}_m{m}_xmin_min_chain_initial",
+    )
 
     opt_knots, signs, S, A, iterations, z = descent_algorithm(
         x_min_knots[1:-1], f, a, b, m, k, nsamples=1000, track_iterates=False
@@ -626,6 +642,11 @@ if __name__ == "__main__":
     print(f"Final knots: {opt_knots}")
     print(f"Final z={z:.12f}, counts={A.alternance_per_interval(A.basis, signs)}")
 
+    plotting.plot_single(
+        A,
+        points=A.basis,
+        file_name=f"z_{function_name}_k{k}_m{m}_xmin_min_chain_final",
+    )
     # x_min_knots, x_max_knots = nurnberger_mod.get_knots(f, a, b, k, m)
 
     # if len(x_min_knots) != k:
